@@ -313,7 +313,7 @@ class Transformer:
 
 	def transform(self, image=None, C_param=None):
 		self.original_size += image.shape[0]*image.shape[1]
-		print(image.shape)
+		print(image)
 		rimage,comp_sz = tile_disturber(image, C_param)
 		self.compressed_size += comp_sz
 		return rimage
