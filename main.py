@@ -495,6 +495,8 @@ def run_model(args, test_loader, model, datarange=None,TF=None,C_param=None):
     with torch.no_grad():
         end = time.time()
         for step, (images, targets) in enumerate(test_iter):
+            if step<datarange[0]:continue
+            elif step>=datarange[1]:break
             # perform transformation
             if TF is not None:
                 tf_imgs = None
@@ -545,7 +547,7 @@ class Simulator:
         return acc,cr
 
     def test(self):
-        dp = self.get_one_point((0,self.num_batches))
+        dp = self.get_one_point((0,100))
         print (dp,self.num_batches)
 
 
@@ -738,5 +740,5 @@ def main():
 
 if __name__ == '__main__':
     # main()
-    sim = Simulator(train=False)
+    sim = Simulator(train=True)
     sim.test()
