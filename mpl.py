@@ -542,6 +542,7 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
         end = time.time()
         for step, (images, targets) in enumerate(test_iter):
             # perform transformation
+            print(images.shape)
             if TF is not None:
                 tf_imgs = None
                 for th_img in images:
