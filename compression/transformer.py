@@ -98,6 +98,7 @@ def get_STAR(frame):
 
 	# find the keypoints with STAR
 	start = time.perf_counter()
+	print(img.shape)
 	kps = star.detect(img,None)
 	end = time.perf_counter()
 	points = [p.pt for p in kps]
