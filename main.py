@@ -545,8 +545,8 @@ class Simulator:
         return acc,cr
 
     def test(self):
-        dp = self.get_one_point((0,10))
-        print (dp)
+        dp = self.get_one_point((0,self.num_batches))
+        print (dp,self.num_batches)
 
 
 def main():
