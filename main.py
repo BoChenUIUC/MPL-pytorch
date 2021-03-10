@@ -491,7 +491,7 @@ def run_model(args, test_loader, model, datarange=None,TF=None,C_param=None):
     top1 = AverageMeter()
     top5 = AverageMeter()
     model.eval()
-    test_iter = tqdm(test_loader, disable=disable=args.local_rank not in [-1, 0])
+    test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
     with torch.no_grad():
         end = time.time()
         for step, (images, targets) in enumerate(test_iter):
