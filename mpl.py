@@ -556,6 +556,8 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
             #         else:
             #             tf_imgs = torch.cat((tf_imgs,tf_img),0)
             #     images = tf_imgs
+            tf = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+            images = tf(images)
             # end transformation
             data_time.update(time.time() - end)
             batch_size = targets.shape[0]
