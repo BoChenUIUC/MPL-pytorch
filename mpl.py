@@ -426,7 +426,7 @@ def finetune(args, train_loader, test_loader, model, criterion):
     return
 
 class CCVETransfrom(object):
-    def __call__(self, image, boxes=boxes, classes=classes):
+    def __call__(self, image, boxes=None, classes=None):
         print(image)
         exit(0)
         return image, boxes, classes
