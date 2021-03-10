@@ -426,10 +426,9 @@ def finetune(args, train_loader, test_loader, model, criterion):
     return
 
 class CCVETransfrom(object):
-    def __call__(self, image, boxes=None, classes=None):
+    def __call__(self, image):
         print(image)
-        exit(0)
-        return image, boxes, classes
+        return image
 
 def get_dataloader(args,train=True):
     cifar10_mean = (0.4914, 0.4822, 0.4465)
