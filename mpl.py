@@ -541,23 +541,19 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
         end = time.time()
         for step, (images, targets) in enumerate(test_iter):
             # perform transformation
-            # if TF is not None:
-            #     tf_imgs = None
-            #     for th_img in images:
-            #         # np_img = (th_img.permute(1,2,0).numpy()).astype(np.uint8)
-            #         # tf_img = TF.transform(image=np_img, C_param=C_param)
-            #         # tf_img = torch.from_numpy(tf_img).float().permute(2,0,1).unsqueeze(0)
-            #         print('1',th_img.shape)
-            #         tf = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-            #         tf_img = tf(th_img)
-            #         print(tf_img.shape)
-            #         if tf_imgs is None:
-            #             tf_imgs = tf_img
-            #         else:
-            #             tf_imgs = torch.cat((tf_imgs,tf_img),0)
-            #     images = tf_imgs
-            tf = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-            images = tf(images)
+            if TF is not None:
+                tf_imgs = None
+                for th_img in images:
+                    np_img = (th_img.permute(1,2,0).numpy()).astype(np.uint8)
+                    tf_img = TF.transform(image=np_img, C_param=C_param)
+                    tf_img = torch.from_numpy(tf_img).float().permute(2,0,1).unsqueeze(0)
+                    if tf_imgs is None:
+                        tf_imgs = tf_img
+                    else:
+                        tf_imgs = torch.cat((tf_imgs,tf_img),0)
+                images = tf_imgs
+            normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+            images = normalization(images)
             # end transformation
             data_time.update(time.time() - end)
             batch_size = targets.shape[0]
@@ -577,7 +573,7 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. ")
             if (step+1) in ranges:
                 acc += [top1.avg]
-                cr += [0]#[TF.get_compression_ratio() if TF is not None else 0]
+                cr += [TF.get_compression_ratio() if TF is not None else 0]
 
         test_iter.close()
         return acc,cr
