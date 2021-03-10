@@ -544,7 +544,7 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
             if TF is not None:
                 tf_imgs = None
                 for th_img in images:
-                    print(np_img)
+                    print(th_img)
                     exit(0)
                     np_img = (th_img.permute(1,2,0).numpy())
                     tf_img = TF.transform(image=np_img, C_param=C_param)
