@@ -25,7 +25,9 @@ from utils import (AverageMeter, accuracy, create_loss_fn,
                    save_checkpoint, reduce_tensor, model_load_state_dict)
 
 logger = logging.getLogger(__name__)
-
+cifar10_mean = (0.4914, 0.4822, 0.4465)
+cifar10_std = (0.2471, 0.2435, 0.2616)
+        
 
 def setup_opt():
     parser = argparse.ArgumentParser()
@@ -425,18 +427,9 @@ def finetune(args, train_loader, test_loader, model, criterion):
             }, is_best, finetune=True)
     return
 
-class CCVETransfrom(object):
-    def __call__(self, image):
-        print(image)
-        return image
-
 def get_dataloader(args,train=True):
-    cifar10_mean = (0.4914, 0.4822, 0.4465)
-    cifar10_std = (0.2471, 0.2435, 0.2616)
     transform_val = transforms.Compose([
-        CCVETransfrom(),
         transforms.ToTensor(),
-        transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
     ])
     test_dataset = datasets.CIFAR10(args.data_path, train=train, 
                                     transform=transform_val, download=False)
@@ -551,9 +544,11 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
             if TF is not None:
                 tf_imgs = None
                 for th_img in images:
-                    np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
-                    tf_img = TF.transform(image=np_img, C_param=C_param)
-                    tf_img = torch.from_numpy(tf_img/255.0).float().permute(2,0,1).unsqueeze(0)
+                    # np_img = (th_img.permute(1,2,0).numpy()).astype(np.uint8)
+                    # tf_img = TF.transform(image=np_img, C_param=C_param)
+                    # tf_img = torch.from_numpy(tf_img).float().permute(2,0,1).unsqueeze(0)
+                    tf = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+                    th_img = tf(th_img)
                     if tf_imgs is None:
                         tf_imgs = tf_img
                     else:
