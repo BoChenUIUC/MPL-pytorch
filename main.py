@@ -539,7 +539,7 @@ class Simulator:
     def get_one_point(self, datarange, TF=None, C_param=None):
         # start counting the compressed size
         if TF is not None: TF.reset()
-        acc = run_model(self.opt,self.model,self.dataloader,datarange,TF,C_param)
+        acc = run_model(self.opt,self.dataloader,self.model,datarange,TF,C_param)
         # get the compression ratio
         cr = TF.get_compression_ratio() if TF is not None else 0
         return acc,cr
