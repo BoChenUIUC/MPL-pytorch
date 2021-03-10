@@ -545,9 +545,9 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
             if TF is not None:
                 tf_imgs = None
                 for th_img in images:
-                    np_img = th_img.permute(1,2,0).numpy()
+                    np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
                     tf_img = TF.transform(image=np_img[:,:,::-1], C_param=C_param)
-                    tf_img = torch.from_numpy(tf_img[:,:,::-1]).float().permute(2,0,1).unsqueeze(0)
+                    tf_img = torch.from_numpy(tf_img[:,:,::-1]/255.0).float().permute(2,0,1).unsqueeze(0)
                     if tf_imgs is None:
                         tf_imgs = tf_img
                     else:
