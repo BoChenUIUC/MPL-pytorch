@@ -544,7 +544,9 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
             if TF is not None:
                 tf_imgs = None
                 for th_img in images:
-                    np_img = (th_img.permute(1,2,0).numpy()).astype(np.uint8)
+                    print(np_img)
+                    exit(0)
+                    np_img = (th_img.permute(1,2,0).numpy())
                     tf_img = TF.transform(image=np_img, C_param=C_param)
                     tf_img = torch.from_numpy(tf_img).float().permute(2,0,1).unsqueeze(0)
                     if tf_imgs is None:
@@ -573,7 +575,7 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. ")
             if (step+1) in ranges:
                 acc += [top1.avg]
-                cr += [TF.get_compression_ratio() if TF is not None else 0]
+                cr += [0]#[TF.get_compression_ratio() if TF is not None else 0]
 
         test_iter.close()
         return acc,cr
