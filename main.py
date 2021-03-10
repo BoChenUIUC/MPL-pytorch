@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 def setup_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', type=str, required=True, help='experiment name')
+    parser.add_argument('--name', default='CCVE', type=str, help='experiment name')
     parser.add_argument('--data-path', default='./data', type=str, help='data path')
     parser.add_argument('--save-path', default='./checkpoint', type=str, help='save path')
     parser.add_argument('--dataset', default='cifar10', type=str,

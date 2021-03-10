@@ -172,6 +172,7 @@ class C_Generator:
 
 def RL_train(net):
 	np.random.seed(123)
+	torch.manual_seed(2)
 	criterion = nn.MSELoss(reduction='sum')
 	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 	log_file = open('training.log', "w", 1)
@@ -181,7 +182,7 @@ def RL_train(net):
 	sim = Simulator()
 	cgen = C_Generator()
 	num_cfg = 100 # number of cfgs to be explored
-	selected_ranges = [10,50,100,500,1000,2000]
+	selected_ranges = [10*i for i in range(1,10)]+[100*i for i in range(1,8)]+[782]
 	print('Num batches:',num_cfg,sim.num_batches)
 
 	TF = Transformer('compression')
@@ -191,20 +192,13 @@ def RL_train(net):
 		# DDPG-based generator
 		C_param = cgen.get()
 		print_str = str(bi)+str(C_param)
-		print(print_str)
 		# apply the compression param chosen by the generator
-		fetch_start = time.perf_counter()
-		dps = []
-		print_str = str(bi)
-		for r in selected_ranges:
-			# the function to get results from cloud model
-			dp = sim.get_one_point(datarange=(0,r), TF=TF, C_param=np.copy(C_param))
-			dps.append(dp)
-			print_str += '\t'+str(dp[0])+'\t'+str(dp[1])
+		map50s,crs = sim.get_multi_point(selected_ranges, TF=TF, C_param=np.copy(C_param))
+		print_str += str(map50s) + ' ' + str(crs)
 		print(print_str)
 		log_file.write(print_str + '\n')
 		# optimize generator
-		cgen.optimize(dps[-1],False)
+		cgen.optimize((map50s[-1],crs[-1]),False)
 
 	torch.save(net.state_dict(), PATH)
 
