@@ -530,6 +530,53 @@ def run_model(args, test_loader, model, datarange=None,TF=None,C_param=None):
         test_iter.close()
         return top1.avg#, top5.avg
 
+def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=None):
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    top1 = AverageMeter()
+    top5 = AverageMeter()
+    model.eval()
+    test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
+    acc,cr = [],[]
+    with torch.no_grad():
+        end = time.time()
+        for step, (images, targets) in enumerate(test_iter):
+            # perform transformation
+            if TF is not None:
+                tf_imgs = None
+                for th_img in images:
+                    np_img = th_img.permute(1,2,0).numpy()
+                    tf_img = TF.transform(image=np_img[:,:,::-1], C_param=C_param)
+                    tf_img = torch.from_numpy(tf_img[:,:,::-1]).float().permute(2,0,1).unsqueeze(0)
+                    if tf_imgs is None:
+                        tf_imgs = tf_img
+                    else:
+                        tf_imgs = torch.cat((tf_imgs,tf_img),0)
+                images = tf_imgs
+            # end transformation
+            data_time.update(time.time() - end)
+            batch_size = targets.shape[0]
+            images = images.to(args.device)
+            targets = targets.to(args.device)
+            with amp.autocast(enabled=args.amp):
+                outputs = model(images)
+
+            acc1, acc5 = accuracy(outputs, targets, (1, 5))
+            top1.update(acc1[0], batch_size)
+            top5.update(acc5[0], batch_size)
+            batch_time.update(time.time() - end)
+            end = time.time()
+            test_iter.set_description(
+                f"Test Iter: {step+1:3}/{len(test_loader):3}. Data: {data_time.avg:.2f}s. "
+                f"Batch: {batch_time.avg:.2f}s. "
+                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. ")
+            if (step+1) in ranges:
+                acc += [top1.avg]
+                cr += [TF.get_compression_ratio() if TF is not None else 0]
+
+        test_iter.close()
+        return acc,cr
+
 class Simulator:
     def __init__(self,train=True):
         self.opt = setup_opt()
@@ -546,8 +593,14 @@ class Simulator:
         cr = TF.get_compression_ratio() if TF is not None else 0
         return acc,cr
 
+    def get_multi_point(self, ranges, TF=None, C_param=None):
+        if TF is not None: TF.reset()
+        acc,crs = run_model_multi_range(self.opt,self.dataloader,self.model,ranges,TF,C_param)
+        return acc,crs
+
     def test(self):
-        dp = self.get_one_point((0,100))
+        # dp = self.get_one_point((0,100))
+        dp = self.get_multi_point([i*100 for i in range(1,8)])
         print (dp,self.num_batches)
 
 
