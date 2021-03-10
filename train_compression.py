@@ -143,7 +143,7 @@ class C_Generator:
 		state = np.float32(self.paretoFront.get_observation())
 		self.action = self.trainer.get_exploration_action(state)
 		# self.C_param = self.uniform_init_gen()
-		self.action = np.array([.1,.1,.1,.5,.5,0],dtype=np.float64)
+		# self.action = np.array([.1,.1,.1,.5,.5,0],dtype=np.float64)
 		return self.action
 
 	def uniform_init_gen(self):
