@@ -572,7 +572,7 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
                 f"Batch: {batch_time.avg:.2f}s. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. ")
             if (step+1) in ranges:
-                acc += [top1.avg.numpy()]
+                acc += [float(top1.avg)]
                 cr += [TF.get_compression_ratio() if TF is not None else 0]
 
         test_iter.close()
