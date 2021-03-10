@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from test import Simulator
+from mpl import Simulator
 from compression.transformer import Transformer
 from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
