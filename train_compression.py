@@ -204,9 +204,10 @@ def RL_train(net):
 		# optimize generator
 		cgen.optimize((map50s[-1],crs[-1]),False)
 		# write logs
-		cfg_file.write(' '.join(C_param)+'\n')
-		acc_file.write(' '.join(map50s)+'\n')
-		cr_file.write(' '.join(crs)+'\n')
+		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
+		acc_file.write(' '.join([str(n) for n in map50s])+'\n')
+		cr_file.write(' '.join([str(n) for n in crs])+'\n')
+		# if the total reward reaches some point, start profiling and end
 
 	torch.save(net.state_dict(), PATH)
 
