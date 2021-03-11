@@ -206,7 +206,7 @@ class C_Generator:
 			self.paretoFront.save()
 			self.paretoFront.reset()
 
-def pareto_front_approx(net)
+def pareto_front_approx(net):
 	EXP_NAME = 'RE'
 	if EXP_NAME == 'DDPG':
 		net.load_state_dict(torch.load('backup/rsnet.pth'))
