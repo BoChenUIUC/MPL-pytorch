@@ -254,6 +254,7 @@ def tile_disturber(image, C_param):
 			feat_idx += 1
 		roi_end = time.perf_counter()
 
+	C_param = np.clip(C_param,-.5,.5)
 	# weight of different features
 	weights = C_param[:num_features] + 0.5
 	# lower and upper
