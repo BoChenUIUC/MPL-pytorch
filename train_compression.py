@@ -52,7 +52,7 @@ class RSNet(nn.Module):
 
 class ParetoFront:
 	def __init__(self,name='RE'):
-		self.stopping_criterion = 20
+		self.stopping_criterion = 50
 		self.reset()
 		self.pf_file = open(name+'_pf.log', "w", 1)
 		self.area_file = open(name+'_area.log', "w", 1)
@@ -135,7 +135,7 @@ class ParetoFront:
 		angle_arr = [self.data[dp][0] for dp in self.data]
 		if len(angle_arr)==2:return 1
 		angle_diff = np.diff(angle_arr)
-		return 1/(np.std(angle_diff)/np.mean(angle_diff))
+		return 1/(np.std(angle_diff)/np.mean(angle_diff)/len(angle_diff))
 
 	def _area(self):
 		# approximate area
