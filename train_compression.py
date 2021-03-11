@@ -108,9 +108,9 @@ class ParetoFront:
 			self.dominating_cnt += 1
 			self.data[dp] = c_param
 			# area as reward
-			# reward = self._area()
+			reward = self._area()
 			# accuracy as reward for encouragement
-			reward = dp[0]
+			# reward = dp[0]
 		else:
 			self.dominated_c_param += c_param
 			self.dominated_cnt += 1
@@ -165,7 +165,7 @@ class C_Generator:
 	def _DDPG_action(self):
 		# get an action from the actor
 		state = np.float32(self.paretoFront.get_observation())
-		if explore:
+		if self.explore:
 			action = self.trainer.get_exploration_action(state)
 		else:
 			action = self.trainer.get_exploitation_action(state)
