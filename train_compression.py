@@ -169,7 +169,7 @@ class C_Generator:
 			action = self.trainer.get_exploration_action(state)
 		else:
 			action = self.trainer.get_exploitation_action(state)
-		action = (self.action+0.5)%1-0.5
+		action = (action+0.5)%1-0.5
 		return action
 
 	def _RE_action(self):
