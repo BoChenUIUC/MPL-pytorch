@@ -54,6 +54,8 @@ class ParetoFront:
 	def __init__(self):
 		self.stopping_criterion = 20
 		self._reset()
+		self.pf_file = open('pf.log', "w", 1)
+		self.reward_file = open('reward.log', "w", 1)
 
 	def _reset(self):
 		print('Reset environment.')
@@ -66,6 +68,7 @@ class ParetoFront:
 		self.dominated_cnt = 1e-6
 		self.dominating_c_param = np.zeros(6,dtype=np.float64)
 		self.dominating_cnt = 1e-6
+		self.reward = 0
 
 	def add(self, c_param, dp):
 		reward = 0
@@ -109,6 +112,7 @@ class ParetoFront:
 			self.dominated_cnt += 1
 
 		# what if there is a noisy point (.99,.99)
+		self.reward += reward
 		return reward
 
 	def _area(self):
@@ -123,7 +127,9 @@ class ParetoFront:
 	def get_observation(self):
 		new_state = np.concatenate((self.dominating_c_param/self.dominating_cnt,self.dominated_c_param/self.dominated_cnt))
 		if int(self.dominated_cnt + self.dominating_cnt)>=self.stopping_criterion:
-			print(self.data.keys())
+			print(self.reward,self.data.keys())
+			self.pf_file.write(str(self.data)+'\n')
+			self.reward_file.write(str(self.reward)+'\n')
 			self._reset()
 		return new_state
 
@@ -175,7 +181,9 @@ def RL_train(net):
 	torch.manual_seed(2)
 	criterion = nn.MSELoss(reduction='sum')
 	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-	log_file = open('training.log', "w", 1)
+	cfg_file = open('cfg.log', "w", 1)
+	acc_file = open('acc.log', "w", 1)
+	cr_file = open('cr.log', "w", 1)
 
 	# setup target network
 	# so that we only do this once
@@ -191,14 +199,14 @@ def RL_train(net):
 	for bi in range(num_cfg):
 		# DDPG-based generator
 		C_param = cgen.get()
-		print_str = str(bi)+str(C_param)
 		# apply the compression param chosen by the generator
 		map50s,crs = sim.get_multi_point(selected_ranges, TF=TF, C_param=np.copy(C_param))
-		print_str += str(map50s) + ' ' + str(crs)
-		print(print_str)
-		log_file.write(print_str + '\n')
 		# optimize generator
 		cgen.optimize((map50s[-1],crs[-1]),False)
+		# write logs
+		cfg_file.write(' '.join(C_param)+'\n')
+		acc_file.write(' '.join(map50s)+'\n')
+		cr_file.write(' '.join(crs)+'\n')
 
 	torch.save(net.state_dict(), PATH)
 
