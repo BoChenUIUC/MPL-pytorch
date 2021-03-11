@@ -259,9 +259,9 @@ def RL_train(net):
 
 	# setup target network
 	# so that we only do this once
-	sim = Simulator()
-	cgen = C_Generator(explore=True)
-	num_cfg = 500 # number of cfgs to be explored
+	sim = Simulator(train=True)
+	cgen = C_Generator(name='DDPG', explore=True)
+	num_cfg = 100 # number of cfgs to be explored
 	datarange = [0,100]
 	print('Num batches:',num_cfg,sim.num_batches)
 
@@ -280,7 +280,7 @@ def RL_train(net):
 		acc_file.write(str(map50)+'\n')
 		cr_file.write(str(cr)+'\n')
 		# if the total reward reaches some point, start profiling and end
-	cgen.done()
+	cgen.save()
 	torch.save(net.state_dict(), PATH)
 
 def test_run(net):
