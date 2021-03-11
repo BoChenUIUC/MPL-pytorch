@@ -245,7 +245,7 @@ def pareto_front_approx(net):
 	# so that we only do this once
 	sim = Simulator(train=True)
 	cgen = C_Generator(name=EXP_NAME,explore=True)
-	num_cfg = 100 # number of cfgs to be explored
+	num_cfg = 1000 # number of cfgs to be explored
 	datarange = [0,100]
 	print('Num configs:',num_cfg, 'total batches:', sim.num_batches)
 
