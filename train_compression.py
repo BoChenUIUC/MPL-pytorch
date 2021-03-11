@@ -150,6 +150,7 @@ class C_Generator:
 		self.action = self.trainer.get_exploration_action(state)
 		self.action[self.action<-.5] += 1
 		self.action[self.action>.5] -= 1
+		self.action = np.random.random(6)-0.5
 		# self.action = np.array([.1,.1,.1,.5,.5,0],dtype=np.float64)
 		return self.action
 
