@@ -220,11 +220,11 @@ def pareto_front_approx(net):
 
 	# setup target network
 	# so that we only do this once
-	sim = Simulator(train=False)
+	sim = Simulator(train=True)
 	cgen = C_Generator(name=EXP_NAME,explore=False,load_RL_model=(EXP_NAME == 'DDPG'))
 	num_cfg = 100 # number of cfgs to be explored
-	datarange = [0,sim.num_batches]
-	print('Num batches:',num_cfg,sim.num_batches)
+	datarange = [0,100]
+	print('Num configs:',num_cfg, 'total batches:', sim.num_batches)
 
 	TF = Transformer('compression')
 	# the pareto front can be restarted, need to try
