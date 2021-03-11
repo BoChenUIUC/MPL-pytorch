@@ -147,8 +147,9 @@ class C_Generator:
 	def get(self):
 		# get an action from the actor
 		state = np.float32(self.paretoFront.get_observation())
-		self.action = self.trainer.get_exploitation_action(state)
-		# self.C_param = self.uniform_init_gen()
+		self.action = self.trainer.get_exploration_action(state)
+		self.action[self.action<-.5] += 1
+		self.action[self.action>.5] -= 1
 		# self.action = np.array([.1,.1,.1,.5,.5,0],dtype=np.float64)
 		return self.action
 
