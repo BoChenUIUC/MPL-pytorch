@@ -52,7 +52,7 @@ class RSNet(nn.Module):
 
 class ParetoFront:
 	def __init__(self,name='RE'):
-		self.stopping_criterion = 50
+		self.stopping_criterion = 100
 		self.reset()
 		self.pf_file = open(name+'_pf.log', "w", 1)
 		self.area_file = open(name+'_area.log', "w", 1)
