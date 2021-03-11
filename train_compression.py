@@ -110,9 +110,10 @@ class ParetoFront:
 			# 1. area as reward
 			# reward = self._area()
 			# 2. accuracy as reward for encouragement
-			reward = dp[0]
+			reward = dp[0]*dp[1]
 			# 3. product as reward
 			# 4. only give reward to acc if delta acc>0.1
+			# too small accuracy should be penalized
 		else:
 			self.dominated_c_param += c_param
 			self.dominated_cnt += 1
