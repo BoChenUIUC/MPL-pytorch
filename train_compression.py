@@ -214,9 +214,9 @@ def pareto_front_approx(net):
 	torch.manual_seed(2)
 	criterion = nn.MSELoss(reduction='sum')
 	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-	cfg_file = open('cfg.log', "w", 1)
-	acc_file = open('acc.log', "w", 1)
-	cr_file = open('cr.log', "w", 1)
+	cfg_file = open(EXP_NAME+'_cfg.log', "w", 1)
+	acc_file = open(EXP_NAME+'_acc.log', "w", 1)
+	cr_file = open(EXP_NAME+'_cr.log', "w", 1)
 
 	# setup target network
 	# so that we only do this once
