@@ -134,7 +134,7 @@ class ParetoFront:
 	def _distribution_score(self):
 		angle_arr = [self.data[dp][0] for dp in self.data]
 		if len(angle_arr)==2:return 1
-		angle_diff = np.diff(angle_diff)
+		angle_diff = np.diff(angle_arr)
 		return 1/(np.std(angle_diff)/np.mean(angle_diff))
 
 	def _area(self):
