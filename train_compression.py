@@ -107,7 +107,10 @@ class ParetoFront:
 			self.dominating_c_param += c_param
 			self.dominating_cnt += 1
 			self.data[dp] = c_param
-			reward = self._area()
+			# area as reward
+			# reward = self._area()
+			# accuracy as reward for encouragement
+			reward = dp[0]
 		else:
 			self.dominated_c_param += c_param
 			self.dominated_cnt += 1
