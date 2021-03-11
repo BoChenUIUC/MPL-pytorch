@@ -131,7 +131,7 @@ class ParetoFront:
 	def save(self):
 		self.pf_file.write('ParetoFront\n')
 		for k in self.data:
-			self.pf_file.write(k[0]+' '+k[1]+' '+' '.join([str(n) for n in self.data[k]])+'\n')
+			self.pf_file.write(str(float(k[0]))+' '+str(k[1])+' '+' '.join([str(n) for n in self.data[k]])+'\n')
 		self.area_file.write(str(self._area())+'\n')
 		self.reward_file.write(str(self.reward)+'\n')
 
@@ -143,7 +143,7 @@ class ParetoFront:
 		return new_state
 
 class C_Generator:
-	def __init__(self,name='DDPG',explore=True,load_RL_model=False):
+	def __init__(self,name='DDPG',explore=True):
 		MAX_BUFFER = 1000000
 		S_DIM = 12
 		A_DIM = 6
@@ -152,8 +152,6 @@ class C_Generator:
 		self.name = name
 		self.ram = MemoryBuffer(MAX_BUFFER)
 		self.trainer = Trainer(S_DIM, A_DIM, A_MAX, self.ram)
-		if load_RL_model:
-			self.trainer.load_models(0)
 		self.paretoFront = ParetoFront(name)
 		self.explore = explore
 
@@ -197,9 +195,6 @@ class C_Generator:
 
 	def _DDPG_optimize(self, datapoint, done):
 		# if one episode ends, do nothing
-		if done: 
-			self.trainer.save_models(0)
-			return
 		# use (accuracy,bandwidth) to update observation
 		state = self.paretoFront.get_observation()
 		reward = self.paretoFront.add(self.action, datapoint)
@@ -214,9 +209,7 @@ class C_Generator:
 			self.paretoFront.reset()
 
 def pareto_front_approx(net):
-	EXP_NAME = 'RE'
-	if EXP_NAME == 'DDPG':
-		net.load_state_dict(torch.load('backup/rsnet.pth'))
+	EXP_NAME = 'DDPG'
 	np.random.seed(123)
 	torch.manual_seed(2)
 	criterion = nn.MSELoss(reduction='sum')
@@ -228,7 +221,7 @@ def pareto_front_approx(net):
 	# setup target network
 	# so that we only do this once
 	sim = Simulator(train=True)
-	cgen = C_Generator(name=EXP_NAME,explore=False,load_RL_model=(EXP_NAME == 'DDPG'))
+	cgen = C_Generator(name=EXP_NAME,explore=False)
 	num_cfg = 100 # number of cfgs to be explored
 	datarange = [0,100]
 	print('Num configs:',num_cfg, 'total batches:', sim.num_batches)
@@ -247,42 +240,6 @@ def pareto_front_approx(net):
 		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
 		acc_file.write(str(float(map50))+'\n')
 		cr_file.write(str(cr)+'\n')
-	cgen.save()
-
-	torch.save(net.state_dict(), PATH)
-
-def RL_train(net):
-	np.random.seed(123)
-	torch.manual_seed(2)
-	criterion = nn.MSELoss(reduction='sum')
-	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-	cfg_file = open('cfg.log', "w", 1)
-	acc_file = open('acc.log', "w", 1)
-	cr_file = open('cr.log', "w", 1)
-
-	# setup target network
-	# so that we only do this once
-	sim = Simulator(train=True)
-	cgen = C_Generator(name='DDPG', explore=True)
-	num_cfg = 100 # number of cfgs to be explored
-	datarange = [0,100]
-	print('Num batches:',num_cfg,sim.num_batches)
-
-	TF = Transformer('compression')
-	# the pareto front can be restarted, need to try
-
-	for bi in range(num_cfg):
-		# DDPG-based generator
-		C_param = cgen.get()
-		# apply the compression param chosen by the generator
-		map50,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=np.copy(C_param))
-		# optimize generator
-		cgen.optimize((map50,cr),False)
-		# write logs
-		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
-		acc_file.write(str(map50)+'\n')
-		cr_file.write(str(cr)+'\n')
-		# if the total reward reaches some point, start profiling and end
 	cgen.save()
 	torch.save(net.state_dict(), PATH)
 
