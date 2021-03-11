@@ -500,14 +500,16 @@ def run_model(args, test_loader, model, datarange=None,TF=None,C_param=None):
             if TF is not None:
                 tf_imgs = None
                 for th_img in images:
-                    np_img = th_img.permute(1,2,0).numpy()
-                    tf_img = TF.transform(image=np_img[:,:,::-1], C_param=C_param)
-                    tf_img = torch.from_numpy(tf_img[:,:,::-1]).float().permute(2,0,1).unsqueeze(0)
+                    np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+                    tf_img = TF.transform(image=np_img, C_param=C_param)
+                    tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
                     if tf_imgs is None:
                         tf_imgs = tf_img
                     else:
                         tf_imgs = torch.cat((tf_imgs,tf_img),0)
                 images = tf_imgs
+            normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+            images = normalization(images)
             # end transformation
             data_time.update(time.time() - end)
             batch_size = targets.shape[0]

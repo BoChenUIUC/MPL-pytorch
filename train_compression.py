@@ -147,7 +147,7 @@ class C_Generator:
 	def get(self):
 		# get an action from the actor
 		state = np.float32(self.paretoFront.get_observation())
-		self.action = self.trainer.get_exploration_action(state)
+		self.action = self.trainer.get_exploitation_action(state)
 		# self.C_param = self.uniform_init_gen()
 		# self.action = np.array([.1,.1,.1,.5,.5,0],dtype=np.float64)
 		return self.action
@@ -177,6 +177,41 @@ class C_Generator:
 
 
 def RL_train(net):
+	np.random.seed(123)
+	torch.manual_seed(2)
+	criterion = nn.MSELoss(reduction='sum')
+	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+	cfg_file = open('cfg.log', "w", 1)
+	acc_file = open('acc.log', "w", 1)
+	cr_file = open('cr.log', "w", 1)
+
+	# setup target network
+	# so that we only do this once
+	sim = Simulator()
+	cgen = C_Generator()
+	num_cfg = 500 # number of cfgs to be explored
+	datarange = [0,100]
+	print('Num batches:',num_cfg,sim.num_batches)
+
+	TF = Transformer('compression')
+	# the pareto front can be restarted, need to try
+
+	for bi in range(num_cfg):
+		# DDPG-based generator
+		C_param = cgen.get()
+		# apply the compression param chosen by the generator
+		map50,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=np.copy(C_param))
+		# optimize generator
+		cgen.optimize((map50,cr),False)
+		# write logs
+		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
+		acc_file.write(str(map50)+'\n')
+		cr_file.write(str(cr)+'\n')
+		# if the total reward reaches some point, start profiling and end
+
+	torch.save(net.state_dict(), PATH)
+
+def test_run(net):
 	np.random.seed(123)
 	torch.manual_seed(2)
 	criterion = nn.MSELoss(reduction='sum')
