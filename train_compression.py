@@ -51,13 +51,14 @@ class RSNet(nn.Module):
 		return x
 
 class ParetoFront:
-	def __init__(self):
+	def __init__(self,name='RE'):
 		self.stopping_criterion = 20
-		self._reset()
-		self.pf_file = open('pf.log', "w", 1)
-		self.reward_file = open('reward.log', "w", 1)
+		self.reset()
+		self.pf_file = open(name+'_pf.log', "w", 1)
+		self.area_file = open(name+'_area.log', "w", 1)
+		self.reward_file = open(name+'_reward.log', "w", 1)
 
-	def _reset(self):
+	def reset(self):
 		print('Reset environment.')
 		# points on pareto front
 		# (acc,cr,c_param)
@@ -124,46 +125,70 @@ class ParetoFront:
 			left = datapoint[0]
 		return area
 
+	def save(self):
+		self.pf_file.write(str(self.data)+'\n')
+		self.area_file.write(str(self._area())+'\n')
+		self.reward_file.write(str(self.reward)+'\n')
+
+	def end_of_episode(self):
+		return int(self.dominated_cnt + self.dominating_cnt)>=self.stopping_criterion
+
 	def get_observation(self):
 		new_state = np.concatenate((self.dominating_c_param/self.dominating_cnt,self.dominated_c_param/self.dominated_cnt))
-		if int(self.dominated_cnt + self.dominating_cnt)>=self.stopping_criterion:
-			print(self.reward,self.data.keys())
-			self.pf_file.write(str(self.data)+'\n')
-			self.reward_file.write(str(self.reward)+'\n')
-			self._reset()
 		return new_state
 
 class C_Generator:
-	def __init__(self):
+	def __init__(self,name='DDPG',explore=True,load_RL_model=False):
 		MAX_BUFFER = 1000000
 		S_DIM = 12
 		A_DIM = 6
 		A_MAX = 0.5 #[-.5,.5]
 
+		self.name = name
 		self.ram = MemoryBuffer(MAX_BUFFER)
 		self.trainer = Trainer(S_DIM, A_DIM, A_MAX, self.ram)
-		self.paretoFront = ParetoFront()
+		if load_RL_model:
+			self.trainer.load_models(0)
+		self.paretoFront = ParetoFront(name)
+		self.explore = explore
 
 	def get(self):
-		# get an action from the actor
-		state = np.float32(self.paretoFront.get_observation())
-		self.action = self.trainer.get_exploration_action(state)
-		self.action[self.action<-.5] += 1
-		self.action[self.action>.5] -= 1
-		self.action = np.random.random(6)-0.5
-		# self.action = np.array([.1,.1,.1,.5,.5,0],dtype=np.float64)
+		if self.name == 'DDPG':
+			self.action = self._DDPG_action()
+		else:
+			self.action = self._RE_action()
 		return self.action
 
-	def uniform_init_gen(self):
-		# 0,1,2:feature weights; 3,4:lower and upper; 5:order
-		output = np.zeros(6,dtype=np.float64)
-		output[:4] = np.random.randint(1,10,4)
-		output[4] = np.random.randint(output[3],11)
-		output[:5] /= 10
-		output[5] = np.random.randint(0,5) #[1/3,1/2,1,2,3]
-		return output   
+	def _DDPG_action(self):
+		# get an action from the actor
+		state = np.float32(self.paretoFront.get_observation())
+		if explore:
+			self.action = self.trainer.get_exploration_action(state)
+		else:
+			self.action = self.trainer.get_exploitation_action(state)
+		self.action = (self.action+0.5)%1-0.5
+		return self.action
+
+	def _RE_action(self):
+		return np.random.random(6)-0.5
+
+	def _GPR_action(self):
+		pass
+
+	def _RF_action(self):
+		pass
+
+	def _MPL_action(self):
+		pass
+
+	def save(self):
+		self.paretoFront.save()
 
 	def optimize(self, datapoint, done):
+		if self.name == 'DDPG':
+			self._DDPG_optimize(datapoint, done)
+
+	def _DDPG_optimize(self, datapoint, done):
 		# if one episode ends, do nothing
 		if done: 
 			self.trainer.save_models(0)
@@ -176,7 +201,48 @@ class C_Generator:
 		self.ram.add(state, self.action, reward, new_state)
 		# optimize the network 
 		self.trainer.optimize()
+		# reset PF if needed
+		if self.explore and self.paretoFront.end_of_episode():
+			self.paretoFront.save()
+			self.paretoFront.reset()
 
+def pareto_front_approx(net)
+	EXP_NAME = 'RE'
+	if EXP_NAME == 'DDPG':
+		net.load_state_dict(torch.load('backup/rsnet.pth'))
+	np.random.seed(123)
+	torch.manual_seed(2)
+	criterion = nn.MSELoss(reduction='sum')
+	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+	cfg_file = open('cfg.log', "w", 1)
+	acc_file = open('acc.log', "w", 1)
+	cr_file = open('cr.log', "w", 1)
+
+	# setup target network
+	# so that we only do this once
+	sim = Simulator(train=False)
+	cgen = C_Generator(name=EXP_NAME,explore=False,load_RL_model=(EXP_NAME == 'DDPG'))
+	num_cfg = 100 # number of cfgs to be explored
+	datarange = [0,sim.num_batches]
+	print('Num batches:',num_cfg,sim.num_batches)
+
+	TF = Transformer('compression')
+	# the pareto front can be restarted, need to try
+
+	for bi in range(num_cfg):
+		# DDPG-based generator
+		C_param = cgen.get()
+		# apply the compression param chosen by the generator
+		map50,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=np.copy(C_param))
+		# optimize generator
+		cgen.optimize((map50,cr),False)
+		# write logs
+		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
+		acc_file.write(str(map50)+'\n')
+		cr_file.write(str(cr)+'\n')
+	cgen.save()
+
+	torch.save(net.state_dict(), PATH)
 
 def RL_train(net):
 	np.random.seed(123)
@@ -190,7 +256,7 @@ def RL_train(net):
 	# setup target network
 	# so that we only do this once
 	sim = Simulator()
-	cgen = C_Generator()
+	cgen = C_Generator(explore=True)
 	num_cfg = 500 # number of cfgs to be explored
 	datarange = [0,100]
 	print('Num batches:',num_cfg,sim.num_batches)
@@ -225,7 +291,7 @@ def test_run(net):
 	# setup target network
 	# so that we only do this once
 	sim = Simulator()
-	cgen = C_Generator()
+	cgen = C_Generator(explore=True)
 	num_cfg = 100 # number of cfgs to be explored
 	selected_ranges = [10*i for i in range(1,10)]+[100*i for i in range(1,8)]+[782]
 	print('Num batches:',num_cfg,sim.num_batches)
@@ -323,5 +389,6 @@ if __name__ == "__main__":
 	net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
 	# net = net.cuda()
-	test_run(net)
+	# test_run(net)
+	pareto_front_approx(net)
 
