@@ -79,6 +79,7 @@ class ParetoFront:
 		# check the distance of (accuracy,bandwidth) to the previous Pareto Front
 		to_remove = set()
 		add_new = True
+		non_trivial = False
 		for point in self.data:
 			if point in [(0,1),(1,0)]:continue
 			# if there is a same point, we dont add this
@@ -88,6 +89,9 @@ class ParetoFront:
 			# if a point is dominated
 			if point[0] <= dp[0] and point[1] <= dp[1]:
 				to_remove.add(point)
+				# more requirement on cr
+				if point[0] <= dp[0] or point[1]+0.05 < dp[1]:
+					non_trivial = True
 			# if the new point is dominated
 			# maybe 0 reward is error is small?
 			elif point[0] >= dp[0] and point[1] >= dp[1]:
@@ -114,7 +118,7 @@ class ParetoFront:
 			pre_score = self._distribution_score()
 			self.data[dp] = (angle,c_param)
 			cur_score = self._distribution_score()
-			reward = cur_score/pre_score
+			reward = cur_score/pre_score if non_trivial else 0
 			# 1. area as reward
 			# reward = self._area()
 			# 2. accuracy as reward for encouragement
