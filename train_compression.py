@@ -321,5 +321,5 @@ if __name__ == "__main__":
 	net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
 	# net = net.cuda()
-	RL_train(net)
+	test_run(net)
 
