@@ -166,7 +166,7 @@ class ParetoFront:
 		return new_state
 
 class C_Generator:
-	def __init__(self,name='DDPG',explore=True):
+	def __init__(self,name='CCVE',explore=True):
 		MAX_BUFFER = 1000000
 		S_DIM = 12
 		A_DIM = 6
@@ -179,7 +179,7 @@ class C_Generator:
 		self.explore = explore
 
 	def get(self):
-		if self.name == 'DDPG':
+		if self.name == 'CCVE':
 			self.action = self._DDPG_action()
 		else:
 			self.action = self._RE_action()
@@ -198,20 +198,11 @@ class C_Generator:
 	def _RE_action(self):
 		return np.random.random(6)-0.5
 
-	def _GPR_action(self):
-		pass
-
-	def _RF_action(self):
-		pass
-
-	def _MPL_action(self):
-		pass
-
 	def save(self):
 		self.paretoFront.save()
 
 	def optimize(self, datapoint, done):
-		if self.name == 'DDPG':
+		if self.name == 'CCVE':
 			self._DDPG_optimize(datapoint, done)
 		elif self.name == 'RE':
 			self.paretoFront.add(self.action, datapoint)
@@ -231,12 +222,10 @@ class C_Generator:
 			self.paretoFront.save()
 			self.paretoFront.reset()
 
-def pareto_front_approx(net):
-	EXP_NAME = 'DDPG'
+def pareto_front_approx():
+	EXP_NAME = 'RE'
 	np.random.seed(123)
 	torch.manual_seed(2)
-	criterion = nn.MSELoss(reduction='sum')
-	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 	cfg_file = open(EXP_NAME+'_cfg.log', "w", 1)
 	acc_file = open(EXP_NAME+'_acc.log', "w", 1)
 	cr_file = open(EXP_NAME+'_cr.log', "w", 1)
@@ -264,13 +253,33 @@ def pareto_front_approx(net):
 		acc_file.write(str(float(map50))+'\n')
 		cr_file.write(str(cr)+'\n')
 	cgen.save()
-	torch.save(net.state_dict(), PATH)
 
-def test_run(net):
+# input: pf file/JPEG/JPEG2000
+# output: pf file on test
+def evaluation():
+	EXP_NAME = 'CCVE'
 	np.random.seed(123)
 	torch.manual_seed(2)
-	criterion = nn.MSELoss(reduction='sum')
-	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+
+	sim = Simulator()
+	pf = ParetoFront(EXP_NAME)
+	TF = Transformer(name=EXP_NAME)
+	datarange = [0,sim.num_batches]
+
+	if EXP_NAME == 'CCVE':
+		with open('DDPG_pf.log','r') as f:
+			for line in f.readlines:
+		# sim.get_one_point(datarange, TF=TF, C_param=C_param)
+		# pf.add(C_param,(map50,cr))
+		pass
+	else:
+		map50,cr = sim.get_one_point(datarange, TF=TF, C_param=None)
+		print(map50,cr)
+
+
+def test_run():
+	np.random.seed(123)
+	torch.manual_seed(2)
 	cfg_file = open('cfg.log', "w", 1)
 	acc_file = open('acc.log', "w", 1)
 	cr_file = open('cr.log', "w", 1)
@@ -297,9 +306,6 @@ def test_run(net):
 		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
 		acc_file.write(' '.join([str(n) for n in map50s])+'\n')
 		cr_file.write(' '.join([str(n) for n in crs])+'\n')
-		# if the total reward reaches some point, start profiling and end
-
-	torch.save(net.state_dict(), PATH)
 
 def dual_train(net):
 	np.random.seed(123)
@@ -373,9 +379,9 @@ def dual_train(net):
 
 if __name__ == "__main__":
 	# prepare network
-	net = RSNet()
+	# net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
 	# net = net.cuda()
-	# test_run(net)
-	pareto_front_approx(net)
+	# test_run()
+	pareto_front_approx()
 
