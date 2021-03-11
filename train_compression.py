@@ -63,6 +63,9 @@ class ParetoFront:
 		# points on pareto front
 		# (acc,cr,c_param)
 		self.data = SortedDict()
+		# init with points at two ends
+		self.data[(0,1)] = (0,None)
+		self.data[(1,0)] = (np.pi/2,None)
 		# average compression param of cfgs
 		# on and not on pareto front
 		self.dominated_c_param = np.zeros(6,dtype=np.float64)
@@ -77,6 +80,7 @@ class ParetoFront:
 		to_remove = set()
 		add_new = True
 		for point in self.data:
+			if point in [(0,1),(1,0)]:continue
 			# if there is a same point, we dont add this
 			if point[:2] == dp: 
 				add_new = False
@@ -96,9 +100,9 @@ class ParetoFront:
 
 		# remove dominated points
 		for point in to_remove:
-			self.dominated_c_param += self.data[point]
+			self.dominated_c_param += self.data[point][1]
 			self.dominated_cnt += 1
-			self.dominating_c_param -= self.data[point]
+			self.dominating_c_param -= self.data[point][1]
 			self.dominating_cnt -= 1
 			del self.data[point]
 
@@ -106,14 +110,19 @@ class ParetoFront:
 		if add_new:
 			self.dominating_c_param += c_param
 			self.dominating_cnt += 1
-			self.data[dp] = c_param
+			angle = np.arctan(dp[1]/dp[0])
+			pre_score = self._distribution_score()
+			self.data[dp] = (angle,c_param)
+			cur_score = self._distribution_score()
+			reward = cur_score/pre_score
 			# 1. area as reward
 			# reward = self._area()
 			# 2. accuracy as reward for encouragement
-			reward = dp[0]*dp[1]
+			# reward = dp[0]*dp[1]
 			# 3. product as reward
 			# 4. only give reward to acc if delta acc>0.1
 			# too small accuracy should be penalized
+			# min angle as reward
 		else:
 			self.dominated_c_param += c_param
 			self.dominated_cnt += 1
@@ -121,6 +130,12 @@ class ParetoFront:
 		# what if there is a noisy point (.99,.99)
 		self.reward += reward
 		return reward
+
+	def _distribution_score(self):
+		angle_arr = [self.data[dp][0] for dp in self.data]
+		if len(angle_arr)==2:return 1
+		angle_diff = np.diff(angle_diff)
+		return 1/(np.std(angle_diff)/np.mean(angle_diff))
 
 	def _area(self):
 		# approximate area
@@ -134,7 +149,8 @@ class ParetoFront:
 	def save(self):
 		self.pf_file.write('ParetoFront\n')
 		for k in self.data:
-			self.pf_file.write(str(float(k[0]))+' '+str(k[1])+' '+' '.join([str(n) for n in self.data[k]])+'\n')
+			if k in [(0,1),(1,0)]:continue
+			self.pf_file.write(str(float(k[0]))+' '+str(k[1])+' '+' '.join([str(n) for n in self.data[k][1]])+'\n')
 		self.area_file.write(str(self._area())+'\n')
 		self.reward_file.write(str(self.reward)+'\n')
 
