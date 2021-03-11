@@ -126,7 +126,9 @@ class ParetoFront:
 		return area
 
 	def save(self):
-		self.pf_file.write(str(self.data)+'\n')
+		self.pf_file.write('ParetoFront\n')
+		for k in data:
+			self.pf_file.write(k[0]+' '+k[1]+' '+' '.join([str(n) for n in data[k]])+'\n')
 		self.area_file.write(str(self._area())+'\n')
 		self.reward_file.write(str(self.reward)+'\n')
 
@@ -163,11 +165,11 @@ class C_Generator:
 		# get an action from the actor
 		state = np.float32(self.paretoFront.get_observation())
 		if explore:
-			self.action = self.trainer.get_exploration_action(state)
+			action = self.trainer.get_exploration_action(state)
 		else:
-			self.action = self.trainer.get_exploitation_action(state)
-		self.action = (self.action+0.5)%1-0.5
-		return self.action
+			action = self.trainer.get_exploitation_action(state)
+		action = (self.action+0.5)%1-0.5
+		return action
 
 	def _RE_action(self):
 		return np.random.random(6)-0.5
@@ -187,6 +189,8 @@ class C_Generator:
 	def optimize(self, datapoint, done):
 		if self.name == 'DDPG':
 			self._DDPG_optimize(datapoint, done)
+		elif self.name == 'RE':
+			self.paretoFront.add(self.action, datapoint)
 
 	def _DDPG_optimize(self, datapoint, done):
 		# if one episode ends, do nothing
@@ -238,7 +242,7 @@ def pareto_front_approx(net):
 		cgen.optimize((map50,cr),False)
 		# write logs
 		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
-		acc_file.write(str(map50)+'\n')
+		acc_file.write(str(float(map50))+'\n')
 		cr_file.write(str(cr)+'\n')
 	cgen.save()
 
@@ -276,7 +280,7 @@ def RL_train(net):
 		acc_file.write(str(map50)+'\n')
 		cr_file.write(str(cr)+'\n')
 		# if the total reward reaches some point, start profiling and end
-
+	cgen.done()
 	torch.save(net.state_dict(), PATH)
 
 def test_run(net):
