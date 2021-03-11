@@ -128,7 +128,7 @@ class ParetoFront:
 	def save(self):
 		self.pf_file.write('ParetoFront\n')
 		for k in data:
-			self.pf_file.write(k[0]+' '+k[1]+' '+' '.join([str(n) for n in data[k]])+'\n')
+			self.pf_file.write(k[0]+' '+k[1]+' '+' '.join([str(n) for n in self.data[k]])+'\n')
 		self.area_file.write(str(self._area())+'\n')
 		self.reward_file.write(str(self.reward)+'\n')
 
