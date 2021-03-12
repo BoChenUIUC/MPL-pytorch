@@ -265,6 +265,7 @@ def pareto_front_approx_mobo():
 	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
 	d['acc_file'] = open('MOBO_acc.log', "w", 1)
 	d['cr_file'] = open('MOBO_cr.log', "w", 1)
+	d['iter'] = 0
 	def objective(x):
 		sim = Simulator(train=True)
 		TF = Transformer('compression')
@@ -273,12 +274,14 @@ def pareto_front_approx_mobo():
 		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
 		d['acc_file'].write(str(float(acc))+'\n')
 		d['cr_file'].write(str(cr)+'\n')
+		print('Iter:',d['iter'])
+		d['iter'] += 1
 		return np.array([float(acc),cr])
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
-	Optimizer.initialize(init_points=5)
-	front, pop = Optimizer.maximize(n_iter=5)
+	Optimizer.initialize(init_points=50)
+	front, pop = Optimizer.maximize(n_iter=1000)
 	# cfg_file = open('MOBO_cfg.log', "w", 1)
 	# pf_file = open('MOBO_pf.log', "w", 1)
 	# for obj in front:
