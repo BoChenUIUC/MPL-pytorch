@@ -444,13 +444,13 @@ if __name__ == "__main__":
 	# test_run()
 
 	# use ddpg or re for approx
-	# pareto_front_approx()
+	pareto_front_approx()
 
-	# convert from .log file to pf
-	# configs2paretofront('DDPG')
+	# convert from .log file to pf for eval
+	# configs2paretofront('CCVE')
 
 	# compute coverage, maybe also hypervolume?
-	comparePF('CCVE','RE')
+	# comparePF('CCVE','RE')
 
-	# pareto_front_approx_mobo()
+	pareto_front_approx_mobo()
 
