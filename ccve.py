@@ -269,13 +269,13 @@ def objective(x):
 	TF = Transformer('compression')
 	datarange = [0,100]
 	acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
-	print('test:',x)
+	print('test:',x,acc,cr)
 	return np.array([float(acc),cr])
 
 # PFA using MOBO
 def pareto_front_approx_mobo():
 	Optimizer = mo.MOBayesianOpt(target=objective,
-		NObj=6,
+		NObj=2,
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=10)
 	front, pop = Optimizer.maximize(n_iter=20)
