@@ -277,8 +277,8 @@ def pareto_front_approx_mobo():
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
-	Optimizer.initialize(init_points=10)
-	front, pop = Optimizer.maximize(n_iter=20)
+	Optimizer.initialize(init_points=2)
+	front, pop = Optimizer.maximize(n_iter=4)
 	print(front)
 
 # PFA
