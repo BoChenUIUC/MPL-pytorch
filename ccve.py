@@ -278,7 +278,7 @@ def pareto_front_approx():
 	cgen = C_Generator(name=EXP_NAME,explore=True)
 	num_cfg = 1000 # number of cfgs to be explored
 	datarange = [0,100]
-	print('Num configs:',num_cfg, 'total batches:', sim.num_batches)
+	print(EXP_NAME,'num configs:',num_cfg, 'total batches:', sim.num_batches)
 
 	TF = Transformer('compression')
 	# the pareto front can be restarted, need to try
