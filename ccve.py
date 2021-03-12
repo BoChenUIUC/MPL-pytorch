@@ -11,6 +11,7 @@ from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
 from mpl import Simulator
+import mobopt as mo
 
 # setup
 classes_num = 24
@@ -263,6 +264,23 @@ class C_Generator:
 		if self.explore and self.paretoFront.end_of_episode():
 			self.paretoFront.reset()
 
+def objective(x):
+	sim = Simulator(train=True)
+	TF = Transformer('compression')
+	datarange = [0,100]
+	acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
+	print('test:',x)
+	return np.array([float(acc),cr])
+
+# PFA using MOBO
+def pareto_front_approx_mobo():
+	Optimizer = mo.MOBayesianOpt(target=objective,
+		NObj=6,
+		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
+	Optimizer.initialize(init_points=10)
+	front, pop = Optimizer.maximize(n_iter=20)
+	print(front)
+
 # PFA
 def pareto_front_approx():
 	EXP_NAME = 'RE'
@@ -423,8 +441,13 @@ if __name__ == "__main__":
 	# net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
 	# net = net.cuda()
+	# determine lenght of episode
 	# test_run()
-	pareto_front_approx()
+	# use ddpg or re for approx
+	# pareto_front_approx()
+	# convert from .log file to pf
 	# configs2paretofront('DDPG')
+	# compute coverage, maybe also hypervolume?
 	# comparePF('DDPG','RE')
+	pareto_front_approx_mobo()
 
