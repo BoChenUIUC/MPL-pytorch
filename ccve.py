@@ -10,7 +10,7 @@ from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
-from mpl import Simulator
+# from mpl import Simulator
 import mobopt as mo
 
 # setup
@@ -51,7 +51,7 @@ class RSNet(nn.Module):
 
 		return x
 
-def config2points(name):
+def config2points(EXP_NAME):
 	points = []
 	acc_file = open(EXP_NAME+'_acc.log')
 	cr_file = open(EXP_NAME+'_cr.log')
@@ -77,13 +77,13 @@ def comparePF(name1,name2):
 	pf2 = ParetoFront(name2,10000)
 	points1 = config2points(name1)
 	points2 = config2points(name2)
-	cov_file = open('cov.log', "w", 1)
+	cov_file = open(name1 + '_' + name2 + '.log', "w", 1)
 	for pt1,pt2 in zip(points1,points2):
 		pf1.add(*pt1)
 		pf2.add(*pt2)
 		cov1 = pf1.cov(pf2)
 		cov2 = pf2.cov(pf1)
-		cov_file.write(str(cov1)+' '+str(cov2)+'\n')
+		cov_file.write(str(cov1)+' '+str(cov2)+' '+str(pf1.area())+' '+str(pf2.area())+'\n')
 
 
 class ParetoFront:
@@ -183,11 +183,12 @@ class ParetoFront:
 		angle_diff = np.diff(angle_arr)
 		return 1/(np.std(angle_diff)/np.mean(angle_diff)/len(angle_diff))
 
-	def _area(self):
+	def area(self):
 		# approximate area
 		area = 0
 		left = 0
 		for datapoint in self.data:
+			if datapoint in [(0,1),(1,0)]:continue
 			area += (datapoint[0]-left)*datapoint[1]
 			left = datapoint[0]
 		return area
@@ -269,8 +270,8 @@ def pareto_front_approx_mobo():
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
-	Optimizer.initialize(init_points=10)
-	front, pop = Optimizer.maximize(n_iter=100)
+	Optimizer.initialize(init_points=50)
+	front, pop = Optimizer.maximize(n_iter=1000)
 	cfg_file = open('MOBO_cfg.log', "w", 1)
 	pf_file = open('MOBO_pf.log', "w", 1)
 	for obj in front:
@@ -289,7 +290,7 @@ def pareto_front_approx():
 	# so that we only do this once
 	sim = Simulator(train=True)
 	cgen = C_Generator(name=EXP_NAME,explore=True)
-	num_cfg = 100 # number of cfgs to be explored
+	num_cfg = 1000 # number of cfgs to be explored
 	datarange = [0,100]
 	print(EXP_NAME,'num configs:',num_cfg, 'total batches:', sim.num_batches)
 
@@ -438,13 +439,18 @@ if __name__ == "__main__":
 	# net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
 	# net = net.cuda()
+
 	# determine lenght of episode
 	# test_run()
+
 	# use ddpg or re for approx
-	pareto_front_approx()
+	# pareto_front_approx()
+
 	# convert from .log file to pf
 	# configs2paretofront('DDPG')
+
 	# compute coverage, maybe also hypervolume?
-	# comparePF('DDPG','RE')
-	pareto_front_approx_mobo()
+	comparePF('CCVE','RE')
+
+	# pareto_front_approx_mobo()
 
