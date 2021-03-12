@@ -262,7 +262,6 @@ def objective(x):
 	TF = Transformer('compression')
 	datarange = [0,100]
 	acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
-	print('test:',x,acc,cr)
 	return np.array([float(acc),cr])
 
 # PFA using MOBO
@@ -270,8 +269,8 @@ def pareto_front_approx_mobo():
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
-	Optimizer.initialize(init_points=1)
-	front, pop = Optimizer.maximize(n_iter=1)
+	Optimizer.initialize(init_points=10)
+	front, pop = Optimizer.maximize(n_iter=100)
 	cfg_file = open('MOBO_cfg.log', "w", 1)
 	pf_file = open('MOBO_pf.log', "w", 1)
 	for obj in front:
@@ -442,7 +441,7 @@ if __name__ == "__main__":
 	# determine lenght of episode
 	# test_run()
 	# use ddpg or re for approx
-	# pareto_front_approx()
+	pareto_front_approx()
 	# convert from .log file to pf
 	# configs2paretofront('DDPG')
 	# compute coverage, maybe also hypervolume?
