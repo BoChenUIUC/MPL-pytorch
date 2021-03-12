@@ -148,7 +148,7 @@ class ParetoFront:
 		if add_new:
 			self.dominating_c_param += c_param
 			self.dominating_cnt += 1
-			# angle = np.arctan(dp[1]/dp[0])
+			angle = np.arctan(dp[1]/dp[0])
 			# pre_score = self._distribution_score()
 			self.data[dp] = (angle,c_param)
 			# cur_score = self._distribution_score()
