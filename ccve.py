@@ -148,19 +148,12 @@ class ParetoFront:
 		if add_new:
 			self.dominating_c_param += c_param
 			self.dominating_cnt += 1
-			angle = np.arctan(dp[1]/dp[0])
-			pre_score = self._distribution_score()
+			# angle = np.arctan(dp[1]/dp[0])
+			# pre_score = self._distribution_score()
 			self.data[dp] = (angle,c_param)
-			cur_score = self._distribution_score()
-			reward = cur_score/pre_score if non_trivial else 0
-			# 1. area as reward
-			# reward = self._area()
-			# 2. accuracy as reward for encouragement
-			# reward = dp[0]*dp[1]
-			# 3. product as reward
-			# 4. only give reward to acc if delta acc>0.1
-			# too small accuracy should be penalized
-			# min angle as reward
+			# cur_score = self._distribution_score()
+			# reward = cur_score/pre_score if non_trivial else 0
+			reward = dp[0]
 		else:
 			self.dominated_c_param += c_param
 			self.dominated_cnt += 1
@@ -277,15 +270,18 @@ def pareto_front_approx_mobo():
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
-	Optimizer.initialize(init_points=2)
-	front, pop = Optimizer.maximize(n_iter=4)
-	print(front)
+	Optimizer.initialize(init_points=1)
+	front, pop = Optimizer.maximize(n_iter=1)
+	cfg_file = open('MOBO_cfg.log', "w", 1)
+	pf_file = open('MOBO_pf.log', "w", 1)
+	for obj in front:
+		pf_file.write(' '.join([str(n) for n in obj])+'\n')
+	for cfg in pop:
+		cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
 
 # PFA
 def pareto_front_approx():
-	EXP_NAME = 'RE'
-	np.random.seed(123)
-	torch.manual_seed(2)
+	EXP_NAME = 'CCVE'
 	cfg_file = open(EXP_NAME+'_cfg.log', "w", 1)
 	acc_file = open(EXP_NAME+'_acc.log', "w", 1)
 	cr_file = open(EXP_NAME+'_cr.log', "w", 1)
@@ -294,7 +290,7 @@ def pareto_front_approx():
 	# so that we only do this once
 	sim = Simulator(train=True)
 	cgen = C_Generator(name=EXP_NAME,explore=True)
-	num_cfg = 1000 # number of cfgs to be explored
+	num_cfg = 100 # number of cfgs to be explored
 	datarange = [0,100]
 	print(EXP_NAME,'num configs:',num_cfg, 'total batches:', sim.num_batches)
 
@@ -437,6 +433,8 @@ def dual_train(net):
 		torch.save(net.state_dict(), PATH)
 
 if __name__ == "__main__":
+	np.random.seed(123)
+	torch.manual_seed(2)
 	# prepare network
 	# net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
