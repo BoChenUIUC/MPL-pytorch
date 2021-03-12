@@ -186,11 +186,12 @@ class ParetoFront:
 	def area(self):
 		# approximate area
 		area = 0
-		left = 0
+		right = 1
 		for datapoint in self.data:
 			if datapoint in [(0,1),(1,0)]:continue
-			area += (datapoint[0]-left)*datapoint[1]
-			left = datapoint[0]
+			assert(datapoint[1]<=right and 1>=datapoint[0])
+			area += (1 - datapoint[0])*(right-datapoint[1])
+			right = datapoint[1]
 		return area
 
 	def save(self):
@@ -258,26 +259,32 @@ class C_Generator:
 		if self.explore and self.paretoFront.end_of_episode():
 			self.paretoFront.reset()
 
-def objective(x):
-	sim = Simulator(train=True)
-	TF = Transformer('compression')
-	datarange = [0,100]
-	acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
-	return np.array([float(acc),cr])
-
 # PFA using MOBO
 def pareto_front_approx_mobo():
+	d = {}
+	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
+	d['acc_file'] = open('MOBO_acc.log', "w", 1)
+	d['cr_file'] = open('MOBO_cr.log', "w", 1)
+	def objective(x):
+		sim = Simulator(train=True)
+		TF = Transformer('compression')
+		datarange = [0,100]
+		acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
+		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
+		d['acc_file'].write(str(float(acc))+'\n')
+		d['cr_file'].write(str(cr)+'\n')
+		return np.array([float(acc),cr])
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
-	Optimizer.initialize(init_points=50)
-	front, pop = Optimizer.maximize(n_iter=1000)
-	cfg_file = open('MOBO_cfg.log', "w", 1)
-	pf_file = open('MOBO_pf.log', "w", 1)
-	for obj in front:
-		pf_file.write(' '.join([str(n) for n in obj])+'\n')
-	for cfg in pop:
-		cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
+	Optimizer.initialize(init_points=5)
+	front, pop = Optimizer.maximize(n_iter=5)
+	# cfg_file = open('MOBO_cfg.log', "w", 1)
+	# pf_file = open('MOBO_pf.log', "w", 1)
+	# for obj in front:
+	# 	pf_file.write(' '.join([str(n) for n in obj])+'\n')
+	# for cfg in pop:
+	# 	cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
 
 # PFA
 def pareto_front_approx():
@@ -444,7 +451,7 @@ if __name__ == "__main__":
 	# test_run()
 
 	# use ddpg or re for approx
-	pareto_front_approx()
+	# pareto_front_approx()
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('CCVE')
