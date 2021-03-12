@@ -5,12 +5,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from mpl import Simulator
 from compression.transformer import Transformer
 from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
+from mpl import Simulator
 
 # setup
 classes_num = 24
@@ -50,13 +50,46 @@ class RSNet(nn.Module):
 
 		return x
 
+def config2points(name):
+	points = []
+	acc_file = open(EXP_NAME+'_acc.log')
+	cr_file = open(EXP_NAME+'_cr.log')
+	cfg_file = open(EXP_NAME+'_cfg.log')
+
+	for l1,l2,l3 in zip(acc_file.readlines(),cr_file.readlines(),cfg_file.readlines()):
+		acc = float(l1.strip())
+		cr = float(l2.strip())
+		C_param = [float(n) for n in l3.strip().split() ]
+		points.append((C_param,(acc,cr)))
+	return points
+
+def configs2paretofront(EXP_NAME):
+	pf = ParetoFront(EXP_NAME,10000)
+	points = config2points(EXP_NAME)
+	for C_param,dp in points:
+		pf.add(C_param,(acc,cr))
+	pf.save()
+
+def comparePF(name1,name2):
+	# output coverage
+	pf1 = ParetoFront(name1,10000)
+	pf2 = ParetoFront(name2,10000)
+	points1 = config2points(name1)
+	points2 = config2points(name2)
+	cov_file = open('cov.log', "w", 1)
+	for pt1,pt2 in zip(points1,points2):
+		pf1.add(*pt1)
+		pf2.add(*pt2)
+		cov1 = pf1.cov(pf2)
+		cov2 = pf2.cov(pf1)
+		cov_file.write(str(cov1)+' '+str(cov2)+'\n')
+
+
 class ParetoFront:
-	def __init__(self,name='RE'):
-		self.stopping_criterion = 100
+	def __init__(self,name='RE',stopping_criterion=100):
+		self.stopping_criterion = stopping_criterion
 		self.reset()
 		self.pf_file = open(name+'_pf.log', "w", 1)
-		self.area_file = open(name+'_area.log', "w", 1)
-		self.reward_file = open(name+'_reward.log', "w", 1)
 
 	def reset(self):
 		print('Reset environment.')
@@ -135,6 +168,21 @@ class ParetoFront:
 		self.reward += reward
 		return reward
 
+	def cov(self,other):
+		covered = 0.0
+		for dp1 in other.data:
+			if dp1 in [(0,1),(1,0)]:continue
+			dominated = False
+			for dp2 in self.data:
+				if dp2 in [(0,1),(1,0)]:continue
+				if dp2[0]>dp1[0] and dp2[1]>dp1[1]:
+					dominated = True
+					break
+			if dominated:covered += 1
+		return covered/(len(other.data)-2)
+
+
+
 	def _distribution_score(self):
 		angle_arr = [self.data[dp][0] for dp in self.data]
 		if len(angle_arr)==2:return 1
@@ -151,12 +199,9 @@ class ParetoFront:
 		return area
 
 	def save(self):
-		self.pf_file.write('ParetoFront\n')
 		for k in self.data:
 			if k in [(0,1),(1,0)]:continue
 			self.pf_file.write(str(float(k[0]))+' '+str(k[1])+' '+' '.join([str(n) for n in self.data[k][1]])+'\n')
-		self.area_file.write(str(self._area())+'\n')
-		self.reward_file.write(str(self.reward)+'\n')
 
 	def end_of_episode(self):
 		return int(self.dominated_cnt + self.dominating_cnt)>=self.stopping_criterion
@@ -198,9 +243,6 @@ class C_Generator:
 	def _RE_action(self):
 		return np.random.random(6)-0.5
 
-	def save(self):
-		self.paretoFront.save()
-
 	def optimize(self, datapoint, done):
 		if self.name == 'CCVE':
 			self._DDPG_optimize(datapoint, done)
@@ -219,9 +261,9 @@ class C_Generator:
 		self.trainer.optimize()
 		# reset PF if needed
 		if self.explore and self.paretoFront.end_of_episode():
-			self.paretoFront.save()
 			self.paretoFront.reset()
 
+# PFA
 def pareto_front_approx():
 	EXP_NAME = 'RE'
 	np.random.seed(123)
@@ -252,7 +294,6 @@ def pareto_front_approx():
 		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
 		acc_file.write(str(float(map50))+'\n')
 		cr_file.write(str(cr)+'\n')
-	cgen.save()
 
 # input: pf file/JPEG/JPEG2000
 # output: pf file on test
@@ -267,16 +308,16 @@ def evaluation():
 	datarange = [0,sim.num_batches]
 
 	if EXP_NAME == 'CCVE':
-		with open('DDPG_pf.log','r') as f:
-			for line in f.readlines:
 		# sim.get_one_point(datarange, TF=TF, C_param=C_param)
 		# pf.add(C_param,(map50,cr))
-		pass
+		with open('DDPG_pf.log','r') as f:
+			for line in f.readlines:
+				tmp = line.strip().split(' ')
 	else:
 		map50,cr = sim.get_one_point(datarange, TF=TF, C_param=None)
 		print(map50,cr)
 
-
+# determine sample size
 def test_run():
 	np.random.seed(123)
 	torch.manual_seed(2)
@@ -384,4 +425,6 @@ if __name__ == "__main__":
 	# net = net.cuda()
 	# test_run()
 	pareto_front_approx()
+	# configs2paretofront('DDPG')
+	# comparePF('DDPG','RE')
 
