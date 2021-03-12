@@ -10,7 +10,7 @@ from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
-# from mpl import Simulator
+from mpl import Simulator
 import mobopt as mo
 
 # setup
