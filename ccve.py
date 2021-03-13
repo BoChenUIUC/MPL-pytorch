@@ -282,7 +282,7 @@ def pareto_front_approx_nsga2():
 			print(x.shape)
 			points = np.array([])
 			for row in range(x.shape[0]):
-				acc,cr = self.sim.get_one_point(datarange=self.datarange, TF=self.TF, C_param=x)
+				acc,cr = self.sim.get_one_point(datarange=self.datarange, TF=self.TF, C_param=x[row,:])
 				points.append(np.array([float(acc),cr]))
 				self.cfg_file.write(' '.join([str(n) for n in x])+'\n')
 				self.acc_file.write(str(float(acc))+'\n')
