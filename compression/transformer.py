@@ -306,17 +306,20 @@ def tile_disturber(image, C_param):
 	return bgr_frame,compressed_size
 
 def JPEG2000(npimg,C_param):
-	cv2.imwrite('jpeg2000/tmp/origin.png',npimg)
-	osize = os.stat('jpeg2000/tmp/origin.png').st_size
-	comp_cmd = './jpeg2000/opj_compress -i jpeg2000/tmp/origin.png -o jpeg2000/tmp/compressed.j2k -r '+str(C_param)
+	comp_dir = 'compression/jpeg2000/'
+	tmp_dir = comp_dir + 'tmp/'
+	cv2.imwrite(tmp_dir+'origin.png',npimg)
+	osize = os.stat(tmp_dir+'origin.png').st_size
+	comp_cmd = './'+comp_dir+'opj_compress -i '+tmp_dir+'origin.png -o '+tmp_dir+'compressed.j2k -r '+str(C_param)
 	subprocess.call(comp_cmd, shell=True)
-	csize = os.stat('jpeg2000/tmp/compressed.j2k').st_size
-	decm_cmd = './jpeg2000/opj_decompress -i jpeg2000/tmp/compressed.j2k -o jpeg2000/tmp/decompressed.png'
+	csize = os.stat(tmp_dir+'compressed.j2k').st_size
+	decm_cmd = './'+comp_dir+'opj_decompress -i '+tmp_dir+'compressed.j2k -o '+tmp_dir+'decompressed.png -r '+str(C_param)
 	subprocess.call(decm_cmd, shell=True)
-	lossy_image = cv2.imread('jpeg2000/tmp/decompressed.png')
+	lossy_image = cv2.imread(tmp_dir+'decompressed.png')
 	return lossy_image,osize,csize
 
 def JPEG(npimg,C_param):
+	print(C_param)
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
 	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)

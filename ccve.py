@@ -373,7 +373,6 @@ def evaluation(EXP_NAME):
 	torch.manual_seed(2)
 
 	sim = Simulator()
-	pf = ParetoFront(EXP_NAME)
 	TF = Transformer(name=EXP_NAME)
 	datarange = [0,sim.num_batches]
 	eval_file = open(EXP_NAME+'_eval.log', "w", 1)
@@ -385,13 +384,13 @@ def evaluation(EXP_NAME):
 				acc,cr = float(tmp[0]),float(tmp[1])
 				C_param = np.array([float(n) for n in tmp[2:]])
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
-				eval_file.write("{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
+				eval_file.write(f"{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
 	else:
 		K = 10 if EXP_NAME == 'PNG' else 101
 		for i in range(K):
 			print(EXP_NAME,i)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=K)
-			eval_file.write("{acc:.3f} {cr:.3f}\n")
+			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 
 # determine sample size
 def test_run():
