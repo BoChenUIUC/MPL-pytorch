@@ -372,7 +372,7 @@ def evaluation(EXP_NAME):
 	np.random.seed(123)
 	torch.manual_seed(2)
 
-	sim = Simulator()
+	sim = Simulator(train=False)
 	TF = Transformer(name=EXP_NAME)
 	datarange = [0,sim.num_batches]
 	eval_file = open(EXP_NAME+'_eval.log', "w", 1)
@@ -516,6 +516,6 @@ if __name__ == "__main__":
 
 	# pareto_front_approx_nsga2()
 
-	for name in ['JPEG','JPEG2000','PNG','CCVE']:
+	for name in ['CCVE','JPEG','JPEG2000','PNG']:
 		evaluation(name)
 
