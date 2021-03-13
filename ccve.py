@@ -96,7 +96,6 @@ def comparePF(name1,name2):
 					str(pf1.area())+' '+str(pf2.area())+' '+
 					str(pf1.uniformity())+' '+ str(pf2.uniformity())+'\n')
 
-
 class ParetoFront:
 	def __init__(self,name='RE',stopping_criterion=100):
 		self.stopping_criterion = stopping_criterion
