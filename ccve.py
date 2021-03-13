@@ -293,7 +293,7 @@ def pareto_front_approx_nsga2():
 
 	problem = MyProblem()
 
-	algorithm = NSGA2(pop_size=100)
+	algorithm = NSGA2(pop_size=5)
 
 	res = minimize(problem,
 					algorithm,
