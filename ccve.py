@@ -516,6 +516,6 @@ if __name__ == "__main__":
 
 	# pareto_front_approx_nsga2()
 
-	for name in ['JPEG','JPEG2000','PNG']:
+	for name in ['JPEG','JPEG2000','PNG','CCVE']:
 		evaluation(name)
 
