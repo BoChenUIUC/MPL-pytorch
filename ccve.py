@@ -388,8 +388,7 @@ def evaluation(EXP_NAME):
 	else:
 		K = 10 if EXP_NAME == 'PNG' else 101
 		for i in range(K):
-			print(EXP_NAME,i)
-			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=K)
+			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
 			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 
 # determine sample size
