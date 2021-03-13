@@ -279,7 +279,6 @@ def pareto_front_approx_nsga2():
 			self.iter = 0
 
 		def _evaluate(self, x, out, *args, **kwargs):
-			print(x.shape)
 			points = []
 			for row in range(x.shape[0]):
 				acc,cr = self.sim.get_one_point(datarange=self.datarange, TF=self.TF, C_param=x[row,:])
@@ -290,15 +289,14 @@ def pareto_front_approx_nsga2():
 				print('Iter:',self.iter)
 				self.iter += 1
 			out["F"] = np.array(points)
-			print(points)
 
 	problem = MyProblem()
 
-	algorithm = NSGA2(pop_size=5)
+	algorithm = NSGA2(pop_size=20)
 
 	res = minimize(problem,
 					algorithm,
-					('n_gen', 3),
+					('n_gen', 50),
 					seed=1,
 					verbose=False)
 
