@@ -319,7 +319,6 @@ def JPEG2000(npimg,C_param):
 	return lossy_image,osize,csize
 
 def JPEG(npimg,C_param):
-	print(C_param)
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
 	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)
