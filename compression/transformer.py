@@ -312,8 +312,8 @@ def JPEG2000(npimg,C_param):
 	subprocess.call(comp_cmd, shell=True)
 	csize = os.stat('jpeg2000/tmp/compressed.j2k').st_size
 	decm_cmd = './jpeg2000/opj_decompress -i jpeg2000/tmp/compressed.j2k -o jpeg2000/tmp/decompressed.png'
-	subprocess.call(comp_cmd, shell=True)
-	lossy_image = cv2.imread('peg2000/tmp/decompressed.png')
+	subprocess.call(decm_cmd, shell=True)
+	lossy_image = cv2.imread('jpeg2000/tmp/decompressed.png')
 	return lossy_image,osize,csize
 
 def JPEG(npimg,C_param):
@@ -341,9 +341,6 @@ class Transformer:
 	def transform(self, image=None, C_param=None):
 		# need to recover images and print examples
 		# get JPEG lib
-		print(image)
-		cv2.imwrite('test.png',image)
-		exit(0)
 		if self.name == 'JPEG':
 			# 0->100
 			rimage,osize,csize = JPEG(image,C_param)
@@ -372,11 +369,40 @@ class Transformer:
 		assert(self.original_size>0)
 		return 1-1.0*self.compressed_size/self.original_size
 
+def test_dataloader():
+	from torchvision import datasets
+	from torchvision import transforms
+	from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+	transform_val = transforms.Compose([transforms.ToTensor(),])
+	test_dataset = datasets.CIFAR10('.././data', train=True, 
+					transform=transform_val, download=False)
+	test_loader = DataLoader(test_dataset,
+					sampler=SequentialSampler(test_dataset),
+					batch_size=64,
+					num_workers=4)
+	with torch.no_grad():
+		for step, (images, targets) in enumerate(test_loader):
+			for th_img,target in zip(images,targets):
+				npimg = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+				pngimg,pngosize,pngcsize = PNG(npimg,5)
+				print(pngosize,pngcsize)
+				jpegimg,jpegosize,jpegcsize = JPEG(npimg,50)
+				print(jpegosize,jpegcsize)
+				jp2img,jp2isize,jp2csize = JPEG2000(npimg,0)
+				print(jp2isize,jp2csize)
+
+				cv2.imwrite('0.png',npimg)
+				cv2.imwrite('1.png',pngimg)
+				cv2.imwrite('2.png',jpegimg)
+				cv2.imwrite('3.png',jp2img)
+				exit(0)
+
 if __name__ == "__main__":
     # img = cv2.imread('/home/bo/research/dataset/ucf24/compressed/000000.jpg')
-    img = cv2.imread('/home/bo/research/dataset/ucf24/rgb-images/Basketball/v_Basketball_g01_c01/00001.jpg')
+    # img = cv2.imread('/home/bo/research/dataset/ucf24/rgb-images/Basketball/v_Basketball_g01_c01/00001.jpg')
     # analyzer(img)
     # _,osize,csize = JPEG(img,0)
     # PNG(img,9)
-    _,osize,csize = JPEG2000(img,100)
-    print(osize,csize)
+    # _,osize,csize = JPEG2000(img,100)
+    # print(osize,csize)
+    test_dataloader()

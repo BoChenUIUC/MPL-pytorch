@@ -337,6 +337,9 @@ def pareto_front_approx():
 	acc_file = open(EXP_NAME+'_acc.log', "w", 1)
 	cr_file = open(EXP_NAME+'_cr.log', "w", 1)
 
+	# test wigh 500 iter
+	start = time.perf_counter()
+
 	# setup target network
 	# so that we only do this once
 	sim = Simulator(train=True)
@@ -359,11 +362,13 @@ def pareto_front_approx():
 		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
 		acc_file.write(str(float(map50))+'\n')
 		cr_file.write(str(cr)+'\n')
+	# test wigh 500 iter
+	end = time.perf_counter()
+	print('Profiling time:',end-start)
 
 # input: pf file/JPEG/JPEG2000
 # output: pf file on test
-def evaluation():
-	EXP_NAME = 'JPEG' # JPEG,JPEG2000,PNG
+def evaluation(EXP_NAME):
 	np.random.seed(123)
 	torch.manual_seed(2)
 
@@ -384,8 +389,9 @@ def evaluation():
 	else:
 		K = 10 if EXP_NAME == 'PNG' else 101
 		for i in range(K):
+			print(EXP_NAME,i)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=K)
-			eval_file.write("{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
+			eval_file.write("{acc:.3f} {cr:.3f}\n")
 
 # determine sample size
 def test_run():
@@ -512,5 +518,6 @@ if __name__ == "__main__":
 
 	# pareto_front_approx_nsga2()
 
-	evaluation()
+	for name in ['JPEG','JPEG2000','PNG']:
+		evaluation(name)
 
