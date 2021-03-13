@@ -70,11 +70,14 @@ def config2points(EXP_NAME):
 		points.append((C_param,(acc,cr)))
 	return points
 
-def configs2paretofront(EXP_NAME):
+def configs2paretofront(EXP_NAME,max_points):
 	pf = ParetoFront(EXP_NAME,10000)
 	points = config2points(EXP_NAME)
+	cnt = 0
 	for C_param,dp in points:
-		pf.add(C_param,(acc,cr))
+		pf.add(C_param,dp)
+		cnt += 1
+		if cnt == max_points:break
 	pf.save()
 
 def comparePF(name1,name2):
@@ -362,7 +365,7 @@ def pareto_front_approx():
 # input: pf file/JPEG/JPEG2000
 # output: pf file on test
 def evaluation():
-	EXP_NAME = 'CCVE'
+	EXP_NAME = 'CCVE' # JPEG,JPEG2000,PNG
 	np.random.seed(123)
 	torch.manual_seed(2)
 
@@ -370,16 +373,21 @@ def evaluation():
 	pf = ParetoFront(EXP_NAME)
 	TF = Transformer(name=EXP_NAME)
 	datarange = [0,sim.num_batches]
+	eval_file = open(EXP_NAME+'_eval.log', "w", 1)
 
 	if EXP_NAME == 'CCVE':
-		# sim.get_one_point(datarange, TF=TF, C_param=C_param)
-		# pf.add(C_param,(map50,cr))
-		with open('DDPG_pf.log','r') as f:
+		with open('MOBO_pf.log','r') as f:
 			for line in f.readlines:
 				tmp = line.strip().split(' ')
+				acc,cr = float(tmp[0]),float(tmp[1])
+				C_param = [float(n) for n in tmp[2:]]
+				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
+				eval_file.write("{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
 	else:
-		map50,cr = sim.get_one_point(datarange, TF=TF, C_param=None)
-		print(map50,cr)
+		K = 10 if EXP_NAME == 'PNG' else 101
+		for i in range(K):
+			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=K)
+			eval_file.write("{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
 
 # determine sample size
 def test_run():
@@ -497,12 +505,14 @@ if __name__ == "__main__":
 	# pareto_front_approx()
 
 	# convert from .log file to pf for eval
-	# configs2paretofront('CCVE')
+	# configs2paretofront('MOBO',500)
 
 	# compute coverage, maybe also hypervolume?
 	# comparePF('CCVE','RE')
 
 	# pareto_front_approx_mobo()
 
-	pareto_front_approx_nsga2()
+	# pareto_front_approx_nsga2()
+
+	evaluation()
 

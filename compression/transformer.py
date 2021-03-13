@@ -9,7 +9,8 @@ from torch.utils.data import Dataset
 from collections import OrderedDict
 from PIL import Image
 from io import StringIO
-import pickle,sys
+import pickle,sys,os
+import subprocess
 
 dataset = 'ucf101-24'
 
@@ -305,47 +306,31 @@ def tile_disturber(image, C_param):
 	return bgr_frame,compressed_size
 
 def JPEG2000(npimg,C_param):
-	cv2.imwrite('compression/jpeg2000/tmp/origin.png')
-	comp_cmd = './opj_compress -i origin.png -o image.j2k -r '+str(C_param)
-	os.system(comp_cmd)
+	cv2.imwrite('jpeg2000/tmp/origin.png',npimg)
+	osize = os.stat('jpeg2000/tmp/origin.png').st_size
+	comp_cmd = './jpeg2000/opj_compress -i jpeg2000/tmp/origin.png -o jpeg2000/tmp/compressed.j2k -r '+str(C_param)
+	subprocess.call(comp_cmd, shell=True)
+	csize = os.stat('jpeg2000/tmp/compressed.j2k').st_size
+	decm_cmd = './jpeg2000/opj_decompress -i jpeg2000/tmp/compressed.j2k -o jpeg2000/tmp/decompressed.png'
+	subprocess.call(comp_cmd, shell=True)
+	lossy_image = cv2.imread('peg2000/tmp/decompressed.png')
+	return lossy_image,osize,csize
 
 def JPEG(npimg,C_param):
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
-	print(npimg.shape)
-	cv2.imshow('test',npimg)
-	cv2.waitKey(0)
-	data = pickle.dumps(npimg, 0)
-	size = len(data)
-	print('original size:',size,sys.getsizeof(data))
+	osize = len(pickle.dumps(npimg, 0))
 	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)
-	data = pickle.dumps(lossy_image, 0)
-	size = len(data)
-	print('compressed size:',size,sys.getsizeof(data))
+	csize = len(pickle.dumps(lossy_image, 0))
 	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
-	cv2.imshow('test2',lossy_image)
-	cv2.waitKey(0)
-	data = pickle.dumps(lossy_image, 0)
-	size = len(data)
-	print('decompressed size:',size,sys.getsizeof(data))
+	return lossy_image,osize,csize
 
 def PNG(npimg,C_param):
 	encode_param = [int(cv2.IMWRITE_PNG_COMPRESSION), C_param]
-	print(npimg.shape)
-	cv2.imshow('test',npimg)
-	cv2.waitKey(0)
-	data = pickle.dumps(npimg, 0)
-	size = len(data)
-	print('original size:',size,sys.getsizeof(data))
+	osize = len(pickle.dumps(npimg, 0))
 	result, lossy_image = cv2.imencode('.png', npimg, encode_param)
-	data = pickle.dumps(lossy_image, 0)
-	size = len(data)
-	print('compressed size:',size,sys.getsizeof(data))
+	csize = len(pickle.dumps(lossy_image, 0))
 	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
-	cv2.imshow('test2',lossy_image)
-	cv2.waitKey(0)
-	data = pickle.dumps(lossy_image, 0)
-	size = len(data)
-	print('decompressed size:',size,sys.getsizeof(data))
+	return lossy_image,osize,csize
 
 # define a class for transformation
 class Transformer:
@@ -362,7 +347,9 @@ class Transformer:
 			self.original_size += osize
 			self.compressed_size += csize
 		elif self.name == 'JPEG2000':
-			rimage = image
+			rimage,osize,csize = JPEG2000(image,C_param)
+			self.original_size += osize
+			self.compressed_size += csize
 		elif self.name == 'PNG':
 			# 9->0
 			rimage,osize,csize = PNG(image,C_param)
@@ -386,6 +373,7 @@ if __name__ == "__main__":
     # img = cv2.imread('/home/bo/research/dataset/ucf24/compressed/000000.jpg')
     img = cv2.imread('/home/bo/research/dataset/ucf24/rgb-images/Basketball/v_Basketball_g01_c01/00001.jpg')
     # analyzer(img)
-    # JPEG(img,100)
+    # _,osize,csize = JPEG(img,0)
     # PNG(img,9)
-    JPEG2000(img,10)
+    _,osize,csize = JPEG2000(img,100)
+    print(osize,csize)
