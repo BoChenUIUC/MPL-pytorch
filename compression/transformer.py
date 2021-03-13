@@ -341,6 +341,9 @@ class Transformer:
 	def transform(self, image=None, C_param=None):
 		# need to recover images and print examples
 		# get JPEG lib
+		print(image)
+		cv2.imwrite('test.png',image)
+		exit(0)
 		if self.name == 'JPEG':
 			# 0->100
 			rimage,osize,csize = JPEG(image,C_param)

@@ -10,7 +10,7 @@ from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
-from mpl import Simulator
+# from mpl import Simulator
 import mobopt as mo
 # MOO
 from pymoo.algorithms.nsga2 import NSGA2
@@ -66,7 +66,8 @@ def config2points(EXP_NAME):
 	for l1,l2,l3 in zip(acc_file.readlines(),cr_file.readlines(),cfg_file.readlines()):
 		acc = float(l1.strip())
 		cr = float(l2.strip())
-		C_param = [float(n) for n in l3.strip().split() ]
+		# stupid err nvm
+		C_param = [float(n) for n in l3.strip().split() ] if 'NSGA2' not in EXP_NAME else np.zeros(6)
 		points.append((C_param,(acc,cr)))
 	return points
 
@@ -80,21 +81,19 @@ def configs2paretofront(EXP_NAME,max_points):
 		if cnt == max_points:break
 	pf.save()
 
-def comparePF(name1,name2):
-	# output coverage
-	pf1 = ParetoFront(name1,10000)
-	pf2 = ParetoFront(name2,10000)
-	points1 = config2points(name1)
-	points2 = config2points(name2)
-	cov_file = open(name1 + '_' + name2 + '.log', "w", 1)
-	for pt1,pt2 in zip(points1,points2):
-		pf1.add(*pt1)
-		pf2.add(*pt2)
-		cov1 = pf1.cov(pf2)
-		cov2 = pf2.cov(pf1)
-		cov_file.write(str(cov1)+' '+str(cov2)+' '+
-					str(pf1.area())+' '+str(pf2.area())+' '+
-					str(pf1.uniformity())+' '+ str(pf2.uniformity())+'\n')
+def comparePF(max_lines):
+	names = ['MOBO','NSGA2','RL','RE']
+	pfs = [ParetoFront(name,10000) for name in names]
+	points_list = [config2points('all_data/'+name) for name in names]
+	cov_file = open('compare_pf.log', "w", 1)
+	for lidx in range(max_lines):
+		for i in range(4):
+			pfs[i].add(*points_list[i][lidx])
+			cov_best = pfs[0].cov(pfs[i])
+			cov_cur = pfs[i].cov(pfs[0])
+			cov = cov_cur/cov_best if cov_best!=0 else 1
+			cov_file.write(str(pfs[i].area())+' '+str(pfs[i].uniformity())+' '+str(cov)+' ')
+		cov_file.write('\n')
 
 class ParetoFront:
 	def __init__(self,name='RE',stopping_criterion=100):
@@ -285,7 +284,7 @@ def pareto_front_approx_nsga2():
 			for row in range(x.shape[0]):
 				acc,cr = self.sim.get_one_point(datarange=self.datarange, TF=self.TF, C_param=x[row,:])
 				points += [[float(acc),cr]]
-				self.cfg_file.write(' '.join([str(n) for n in x])+'\n')
+				self.cfg_file.write(' '.join([str(n) for n in x[row,:]])+'\n')
 				self.acc_file.write(str(float(acc))+'\n')
 				self.cr_file.write(str(cr)+'\n')
 				print('Iter:',self.iter)
@@ -364,7 +363,7 @@ def pareto_front_approx():
 # input: pf file/JPEG/JPEG2000
 # output: pf file on test
 def evaluation():
-	EXP_NAME = 'CCVE' # JPEG,JPEG2000,PNG
+	EXP_NAME = 'JPEG' # JPEG,JPEG2000,PNG
 	np.random.seed(123)
 	torch.manual_seed(2)
 
@@ -507,7 +506,7 @@ if __name__ == "__main__":
 	# configs2paretofront('MOBO',500)
 
 	# compute coverage, maybe also hypervolume?
-	# comparePF('CCVE','RE')
+	# comparePF(1000)
 
 	# pareto_front_approx_mobo()
 
