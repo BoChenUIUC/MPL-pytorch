@@ -283,7 +283,8 @@ def pareto_front_approx_nsga2():
 			points = np.array([])
 			for row in range(x.shape[0]):
 				acc,cr = self.sim.get_one_point(datarange=self.datarange, TF=self.TF, C_param=x[row,:])
-				points.append(np.array([float(acc),cr]))
+				new_point = np.array([[float(acc),cr]])
+				points = np.concatenate((points,new_point))
 				self.cfg_file.write(' '.join([str(n) for n in x])+'\n')
 				self.acc_file.write(str(float(acc))+'\n')
 				self.cr_file.write(str(cr)+'\n')
@@ -297,7 +298,7 @@ def pareto_front_approx_nsga2():
 
 	res = minimize(problem,
 					algorithm,
-					('n_gen', 5),
+					('n_gen', 3),
 					seed=1,
 					verbose=False)
 
