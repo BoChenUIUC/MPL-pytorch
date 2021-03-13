@@ -501,5 +501,5 @@ if __name__ == "__main__":
 
 	# pareto_front_approx_mobo()
 
-	pareto_front_approx_naga2()
+	pareto_front_approx_nsga2()
 
