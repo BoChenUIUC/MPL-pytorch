@@ -279,13 +279,17 @@ def pareto_front_approx_nsga2():
 			self.iter = 0
 
 		def _evaluate(self, x, out, *args, **kwargs):
-			acc,cr = self.sim.get_one_point(datarange=self.datarange, TF=self.TF, C_param=x)
-			self.cfg_file.write(' '.join([str(n) for n in x])+'\n')
-			self.acc_file.write(str(float(acc))+'\n')
-			self.cr_file.write(str(cr)+'\n')
-			print('Iter:',self.iter)
-			self.iter += 1
-			return np.array([float(acc),cr])
+			print(x.shape)
+			points = np.array([])
+			for row in range(x.shape[0]):
+				acc,cr = self.sim.get_one_point(datarange=self.datarange, TF=self.TF, C_param=x)
+				points.append(np.array([float(acc),cr]))
+				self.cfg_file.write(' '.join([str(n) for n in x])+'\n')
+				self.acc_file.write(str(float(acc))+'\n')
+				self.cr_file.write(str(cr)+'\n')
+				print('Iter:',self.iter)
+				self.iter += 1
+			out["F"] = points
 
 	problem = MyProblem()
 

@@ -257,11 +257,9 @@ def tile_disturber(image, C_param):
 		roi_end = time.perf_counter()
 
 	# weight of different features
-	print(len(C_param),C_param)
 	weights = C_param[:num_features] + 0.5
 	# lower and upper
 	lower,upper = C_param[num_features:num_features+2] + 0.5
-	print(lower,upper)
 	lower,upper = min(lower,upper),max(lower,upper)
 	lower = max(lower,0);upper = min(upper,1)
 	# order to adjust the concentration of the  scores
