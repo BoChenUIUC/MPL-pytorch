@@ -297,10 +297,10 @@ def pareto_front_approx_nsga2():
 					seed=1,
 					verbose=False)
 
-	plot = Scatter()
-	plot.add(problem.pareto_front(), plot_type="line", color="black", alpha=0.7)
-	plot.add(res.F, color="red")
-	plot.show()
+	# plot = Scatter()
+	# plot.add(problem.pareto_front(), plot_type="line", color="black", alpha=0.7)
+	# plot.add(res.F, color="red")
+	# plot.show()
 
 # PFA using MOBO
 def pareto_front_approx_mobo():
