@@ -376,7 +376,7 @@ def evaluation():
 
 	if EXP_NAME == 'CCVE':
 		with open('MOBO_pf.log','r') as f:
-			for line in f.readlines:
+			for line in f.readlines():
 				tmp = line.strip().split(' ')
 				acc,cr = float(tmp[0]),float(tmp[1])
 				C_param = [float(n) for n in tmp[2:]]
