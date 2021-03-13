@@ -379,7 +379,7 @@ def evaluation():
 			for line in f.readlines():
 				tmp = line.strip().split(' ')
 				acc,cr = float(tmp[0]),float(tmp[1])
-				C_param = [float(n) for n in tmp[2:]]
+				C_param = np.array([float(n) for n in tmp[2:]])
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
 				eval_file.write("{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
 	else:
