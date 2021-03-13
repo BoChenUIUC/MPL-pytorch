@@ -8,6 +8,8 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from collections import OrderedDict
 from PIL import Image
+from io import StringIO
+import pickle,sys
 
 dataset = 'ucf101-24'
 
@@ -302,8 +304,48 @@ def tile_disturber(image, C_param):
 	# print(img_index,feat_end-feat_start)
 	return bgr_frame,compressed_size
 
-def JPEG_disturber(image, C_param):
-	return image
+def JPEG2000(npimg,C_param):
+	cv2.imwrite('compression/jpeg2000/tmp/origin.png')
+	comp_cmd = './opj_compress -i origin.png -o image.j2k -r '+str(C_param)
+	os.system(comp_cmd)
+
+def JPEG(npimg,C_param):
+	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
+	print(npimg.shape)
+	cv2.imshow('test',npimg)
+	cv2.waitKey(0)
+	data = pickle.dumps(npimg, 0)
+	size = len(data)
+	print('original size:',size,sys.getsizeof(data))
+	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)
+	data = pickle.dumps(lossy_image, 0)
+	size = len(data)
+	print('compressed size:',size,sys.getsizeof(data))
+	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
+	cv2.imshow('test2',lossy_image)
+	cv2.waitKey(0)
+	data = pickle.dumps(lossy_image, 0)
+	size = len(data)
+	print('decompressed size:',size,sys.getsizeof(data))
+
+def PNG(npimg,C_param):
+	encode_param = [int(cv2.IMWRITE_PNG_COMPRESSION), C_param]
+	print(npimg.shape)
+	cv2.imshow('test',npimg)
+	cv2.waitKey(0)
+	data = pickle.dumps(npimg, 0)
+	size = len(data)
+	print('original size:',size,sys.getsizeof(data))
+	result, lossy_image = cv2.imencode('.png', npimg, encode_param)
+	data = pickle.dumps(lossy_image, 0)
+	size = len(data)
+	print('compressed size:',size,sys.getsizeof(data))
+	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
+	cv2.imshow('test2',lossy_image)
+	cv2.waitKey(0)
+	data = pickle.dumps(lossy_image, 0)
+	size = len(data)
+	print('decompressed size:',size,sys.getsizeof(data))
 
 # define a class for transformation
 class Transformer:
@@ -315,9 +357,17 @@ class Transformer:
 		# need to recover images and print examples
 		# get JPEG lib
 		if self.name == 'JPEG':
-			rimage = image
+			# 0->100
+			rimage,osize,csize = JPEG(image,C_param)
+			self.original_size += osize
+			self.compressed_size += csize
 		elif self.name == 'JPEG2000':
 			rimage = image
+		elif self.name == 'PNG':
+			# 9->0
+			rimage,osize,csize = PNG(image,C_param)
+			self.original_size += osize
+			self.compressed_size += csize
 		else:	
 			self.original_size += image.shape[0]*image.shape[1]
 			rimage,comp_sz = tile_disturber(image, C_param)
@@ -335,4 +385,7 @@ class Transformer:
 if __name__ == "__main__":
     # img = cv2.imread('/home/bo/research/dataset/ucf24/compressed/000000.jpg')
     img = cv2.imread('/home/bo/research/dataset/ucf24/rgb-images/Basketball/v_Basketball_g01_c01/00001.jpg')
-    analyzer(img)
+    # analyzer(img)
+    # JPEG(img,100)
+    # PNG(img,9)
+    JPEG2000(img,10)

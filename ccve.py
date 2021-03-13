@@ -12,6 +12,12 @@ from sortedcontainers import SortedDict
 from tqdm import tqdm
 from mpl import Simulator
 import mobopt as mo
+# MOO
+from pymoo.algorithms.nsga2 import NSGA2
+from pymoo.factory import get_problem
+from pymoo.optimize import minimize
+from pymoo.visualization.scatter import Scatter
+from pymoo.model.problem import Problem
 
 # setup
 classes_num = 24
@@ -83,7 +89,9 @@ def comparePF(name1,name2):
 		pf2.add(*pt2)
 		cov1 = pf1.cov(pf2)
 		cov2 = pf2.cov(pf1)
-		cov_file.write(str(cov1)+' '+str(cov2)+' '+str(pf1.area())+' '+str(pf2.area())+'\n')
+		cov_file.write(str(cov1)+' '+str(cov2)+' '+
+					str(pf1.area())+' '+str(pf2.area())+' '+
+					str(pf1.uniformity())+' '+ str(pf2.uniformity())+'\n')
 
 
 class ParetoFront:
@@ -149,9 +157,9 @@ class ParetoFront:
 			self.dominating_c_param += c_param
 			self.dominating_cnt += 1
 			angle = np.arctan(dp[1]/dp[0])
-			# pre_score = self._distribution_score()
+			# pre_score = self.uniformity()
 			self.data[dp] = (angle,c_param)
-			# cur_score = self._distribution_score()
+			# cur_score = self.uniformity()
 			# reward = cur_score/pre_score if non_trivial else 0
 			reward = dp[0]
 		else:
@@ -175,9 +183,7 @@ class ParetoFront:
 			if dominated:covered += 1
 		return covered/(len(other.data)-2)
 
-
-
-	def _distribution_score(self):
+	def uniformity(self):
 		angle_arr = [self.data[dp][0] for dp in self.data]
 		if len(angle_arr)==2:return 1
 		angle_diff = np.diff(angle_arr)
@@ -259,6 +265,43 @@ class C_Generator:
 		if self.explore and self.paretoFront.end_of_episode():
 			self.paretoFront.reset()
 
+# NAGA2
+def pareto_front_approx_nsga2():
+	class MyProblem(Problem):
+		def __init__(self):
+			super().__init__(n_var=6, n_obj=2, n_constr=0, xl=np.array([-.5]*6), xu=np.array([.5]*6))
+			self.sim = Simulator(train=True)
+			self.TF = Transformer('compression')
+			self.datarange = [0,100]
+			self.cfg_file = open('NSGA2_cfg.log', "w", 1)
+			self.acc_file = open('NSGA2_acc.log', "w", 1)
+			self.cr_file = open('NSGA2_cr.log', "w", 1)
+			self.iter = 0
+
+		def _evaluate(self, x, out, *args, **kwargs):
+			acc,cr = self.sim.get_one_point(datarange=self.datarange, TF=self.TF, C_param=x)
+			self.cfg_file.write(' '.join([str(n) for n in x])+'\n')
+			self.acc_file.write(str(float(acc))+'\n')
+			self.cr_file.write(str(cr)+'\n')
+			print('Iter:',self.iter)
+			self.iter += 1
+			return np.array([float(acc),cr])
+
+	problem = MyProblem()
+
+	algorithm = NSGA2(pop_size=100)
+
+	res = minimize(problem,
+					algorithm,
+					('n_gen', 5),
+					seed=1,
+					verbose=False)
+
+	plot = Scatter()
+	plot.add(problem.pareto_front(), plot_type="line", color="black", alpha=0.7)
+	plot.add(res.F, color="red")
+	plot.show()
+
 # PFA using MOBO
 def pareto_front_approx_mobo():
 	d = {}
@@ -282,12 +325,6 @@ def pareto_front_approx_mobo():
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=50)
 	front, pop = Optimizer.maximize(n_iter=1000)
-	# cfg_file = open('MOBO_cfg.log', "w", 1)
-	# pf_file = open('MOBO_pf.log', "w", 1)
-	# for obj in front:
-	# 	pf_file.write(' '.join([str(n) for n in obj])+'\n')
-	# for cfg in pop:
-	# 	cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
 
 # PFA
 def pareto_front_approx():
@@ -462,5 +499,7 @@ if __name__ == "__main__":
 	# compute coverage, maybe also hypervolume?
 	# comparePF('CCVE','RE')
 
-	pareto_front_approx_mobo()
+	# pareto_front_approx_mobo()
+
+	pareto_front_approx_naga2()
 
