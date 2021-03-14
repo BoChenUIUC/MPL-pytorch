@@ -95,6 +95,30 @@ def comparePF(max_lines):
 			cov_file.write(str(pfs[i].area())+' '+str(pfs[i].uniformity())+' '+str(cov)+' ')
 		cov_file.write('\n')
 
+# for CCVE, 
+def comparePF2():
+	pf1 = ParetoFront("CCVE",10000)
+	pf2 = ParetoFront("JPEG",10000)
+	pf3 = ParetoFront("JPEG2000",10000)
+	eval_file1 = open('all_data/CCVE_eval.log')
+	eval_file2 = open('all_data/JPEG_eval.log')
+	eval_file3 = open('all_data/JPEG2000_eval.log')
+	pfs = [pf1,pf2,pf3]
+	files = [eval_file1,eval_file2,eval_file3]
+	for pf,file in zip(pfs,files):
+		for line in file.readlines():
+			line = line.strip().split(' ')
+			acc,cr = float(line[0]),float(line[1])
+			C_param = np.zeros(6)
+			pf.add(C_param,(acc,cr))
+	with open('all_eval.log','w',1) as f:
+		for i in range(3):
+			cov_best = pfs[0].cov(pfs[i])
+			cov_cur = pfs[i].cov(pfs[0])
+			f.write(str(pfs[i].area())+' '+str(pfs[i].uniformity())+' '+str(cov_best)+' '+str(cov_cur)+'\n' ) 
+
+
+
 class ParetoFront:
 	def __init__(self,name='RE',stopping_criterion=100):
 		self.stopping_criterion = stopping_criterion
@@ -193,12 +217,12 @@ class ParetoFront:
 	def area(self):
 		# approximate area
 		area = 0
-		right = 1
+		bot = 0
 		for datapoint in self.data:
 			if datapoint in [(0,1),(1,0)]:continue
-			assert(datapoint[1]<=right and 1>=datapoint[0])
-			area += (1 - datapoint[0])*(right-datapoint[1])
-			right = datapoint[1]
+			assert(datapoint[0]>=bot)
+			area += (datapoint[0]-bot)*(datapoint[1])
+			bot = datapoint[0]
 		return area
 
 	def save(self):
@@ -386,8 +410,7 @@ def evaluation(EXP_NAME):
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
 				eval_file.write(f"{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
 	else:
-		K = 10 if EXP_NAME == 'PNG' else 101
-		for i in range(K):
+		for i in range(101):
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
 			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 
@@ -510,13 +533,14 @@ if __name__ == "__main__":
 	# configs2paretofront('MOBO',500)
 
 	# compute coverage, maybe also hypervolume?
-	# comparePF(1000)
+	comparePF(1000)
+	comparePF2()
 
 	# pareto_front_approx_mobo()
 
 	# pareto_front_approx_nsga2()
 
 	# 'CCVE','JPEG','JPEG2000',
-	for name in ['PNG']:
+	for name in ['WebP']:
 		evaluation(name)
 

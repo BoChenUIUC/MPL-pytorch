@@ -11,53 +11,44 @@ from PIL import Image
 from io import StringIO
 import pickle,sys,os
 import subprocess
+import matplotlib.pyplot as plt
+import matplotlib
 
 dataset = 'ucf101-24'
 
 def get_edge_feature(frame, edge_blur_rad=11, edge_blur_var=0, edge_canny_low=101, edge_canny_high=255):
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-	start = time.perf_counter()
 	blur = cv2.GaussianBlur(gray, (edge_blur_rad, edge_blur_rad), edge_blur_var)
 	edge = cv2.Canny(blur, edge_canny_low, edge_canny_high)
-	end = time.perf_counter()
-	return edge, end-start
+	return edge
     
 
 def get_KAZE_feature(frame):
 	alg = cv2.KAZE_create()
-	start = time.perf_counter()
 	kps = alg.detect(frame)
-	end = time.perf_counter()
 	kps = sorted(kps, key=lambda x: -x.response)[:32]
 	points = [p.pt for p in kps]
-	return points, end-start
+	return points
 
 def get_harris_corner(frame):
 	img = frame.copy()
 	gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-
-	start = time.perf_counter()
 	dst = cv2.cornerHarris(gray,2,3,0.04)
-	end = time.perf_counter()
-
 	# Threshold for an optimal value, it may vary depending on the image.
 	dst[dst>0.01*dst.max()]=[255]
 	dst[dst<255]=[0]
-	return dst, end-start
+	return dst
 
 def get_GFTT(frame):
 	img = frame.copy()
 	gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-
-	start = time.perf_counter()
 	corners = cv2.goodFeaturesToTrack(gray,25,0.01,10)
-	end = time.perf_counter()
 	if corners is not None:
 		corners = np.int0(corners) 
 		points = [i.ravel() for i in corners]
 	else:
 		points = []
-	return points, end-start
+	return points
 
 # pip install opencv-python==3.4.2.16
 # pip install opencv-contrib-python==3.4.2.16
@@ -66,32 +57,26 @@ def get_SIFT(frame):
 	gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 	sift = cv2.xfeatures2d.SIFT_create()
-	start = time.perf_counter()
 	kps = sift.detect(gray,None)
-	end = time.perf_counter()
 	points = [p.pt for p in kps]
-	return points, end-start
+	return points
 
 def get_SURF(frame):
 	img = frame.copy()
 	gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 	surf = cv2.xfeatures2d.SURF_create()
-	start = time.perf_counter()
 	kps = surf.detect(gray,None)
-	end = time.perf_counter()
 	points = [p.pt for p in kps]
-	return points, end-start
+	return points
 
 def get_FAST(frame):
 	img = frame.copy()
 	gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-	start = time.perf_counter()
 	fast = cv2.FastFeatureDetector_create(threshold=50)
 	kps = fast.detect(img,None)
-	end = time.perf_counter()
 	points = [p.pt for p in kps]
-	return points, end-start
+	return points
 
 def get_STAR(frame):
 	img = frame.copy()
@@ -100,22 +85,18 @@ def get_STAR(frame):
 	star = cv2.xfeatures2d.StarDetector_create()
 
 	# find the keypoints with STAR
-	start = time.perf_counter()
 	kps = star.detect(img,None)
-	end = time.perf_counter()
 	points = [p.pt for p in kps]
-	return points, end-start
+	return points
 
 def get_ORB(frame):
 	img = frame.copy()
 	gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 	orb = cv2.ORB_create()
-	start = time.perf_counter()
 	kps = orb.detect(img,None)
-	end = time.perf_counter()
 	points = [p.pt for p in kps]
-	return points, end-start
+	return points
 
 def count_point_in_ROI(ROI, points):
 	counter = 0
@@ -211,27 +192,105 @@ class LRU(OrderedDict):
 			oldest = next(iter(self))
 			del self[oldest]
 
-def tile_disturber(image, C_param):
-	# analyze features in image
-	feat_start = time.perf_counter()
-	bgr_frame = np.array(image)
-	# edge diff
-	# edge, _ = get_edge_feature(bgr_frame)
-	# harris corner
-	hc, _ = get_harris_corner(bgr_frame)
-	# # GFTT
-	# gftt, _ = get_GFTT(bgr_frame)
-	# FAST
-	fast, _ = get_FAST(bgr_frame)
-	# STAR
-	star, _ = get_STAR(bgr_frame)
-	# ORB
-	orb, _ = get_ORB(bgr_frame)
+def heatmap(data, row_labels, col_labels, ax=None,
+			cbar_kw={}, cbarlabel="", **kwargs):
+	if not ax:
+		ax = plt.gca()
 
-	calc_start = time.perf_counter()
+	# Plot the heatmap
+	im = ax.imshow(data, **kwargs)
+
+	# Create colorbar
+	cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+	cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+
+	# We want to show all ticks...
+	ax.set_xticks(np.arange(data.shape[1]))
+	ax.set_yticks(np.arange(data.shape[0]))
+	# ... and label them with the respective list entries.
+	ax.set_xticklabels(col_labels)
+	ax.set_yticklabels(row_labels)
+
+	# Let the horizontal axes labeling appear on top.
+	ax.tick_params(top=True, bottom=False,
+					labeltop=True, labelbottom=False)
+
+	# Rotate the tick labels and set their alignment.
+	plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+					rotation_mode="anchor")
+
+	# Turn spines off and create white grid.
+	for edge, spine in ax.spines.items():
+		spine.set_visible(False)
+
+	ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+	ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+	ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+	ax.tick_params(which="minor", bottom=False, left=False)
+
+	return im, cbar
+
+def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
+					 textcolors=("black", "white"),
+					 threshold=None, **textkw):
+
+	if not isinstance(data, (list, np.ndarray)):
+		data = im.get_array()
+
+	# Normalize the threshold to the images color range.
+	if threshold is not None:
+		threshold = im.norm(threshold)
+	else:
+		threshold = im.norm(data.max())/2.
+
+	# Set default alignment to center, but allow it to be
+	# overwritten by textkw.
+	kw = dict(horizontalalignment="center",
+			verticalalignment="center")
+	kw.update(textkw)
+
+	# Get the formatter in case a string is supplied
+	if isinstance(valfmt, str):
+		valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+	# Loop over the data and create a `Text` for each "pixel".
+	# Change the text's color depending on the data.
+	texts = []
+	for i in range(data.shape[0]):
+		for j in range(data.shape[1]):
+			kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
+			text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+			texts.append(text)
+
+	return texts
+
+def tile_disturber(image, C_param, counter, snapshot=False):
+	start = time.perf_counter()
+	toSave = snapshot and counter<5
+	# analyze features in image
+	bgr_frame = np.array(image)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:2}_origin.jpg',bgr_frame)
+	# harris corner
+	# hc, _ = get_harris_corner(bgr_frame)
+	# FAST
+	fast = get_FAST(bgr_frame)
+	# STAR
+	star = get_STAR(bgr_frame)
+	# ORB
+	orb = get_ORB(bgr_frame)
+
 	point_features = [fast, star, orb]
 	map_features = []
 	num_features = len(point_features) + len(map_features)
+	# snapshot features optionally
+	if toSave:
+		feature_frame = np.zeros(bgr_frame.shape)
+		colors = [(72, 31, 219),(112, 70, 28),(168, 182, 33)]
+		for points,color in zip(point_features,colors):
+			for px,py in points:
+				feature_frame = cv2.circle(feature_frame, (int(px),int(py)), radius=2, color=color, thickness=-1)
+		cv2.imwrite(f'samples/{counter:2}_feature.jpg',feature_frame)
 	# divide image to 4*3 tiles
 	ROIs = []
 	num_w, num_h = 4,3
@@ -245,7 +304,6 @@ def tile_disturber(image, C_param):
 			ROIs.append([x1,y1,x2,y2])
 	counts = np.zeros((num_w*num_h,num_features))
 	for roi_idx,ROI in enumerate(ROIs):
-		roi_start = time.perf_counter()
 		feat_idx = 0
 		for mf in map_features:
 			c = count_mask_in_ROI(ROI,mf)
@@ -255,7 +313,6 @@ def tile_disturber(image, C_param):
 			c = count_point_in_ROI(ROI,pf)
 			counts[roi_idx,feat_idx] = c
 			feat_idx += 1
-		roi_end = time.perf_counter()
 
 	# weight of different features
 	weights = C_param[:num_features] + 0.5
@@ -274,6 +331,20 @@ def tile_disturber(image, C_param):
 	weighted_scores = np.matmul(normalized_score,weights)
 	# the weight is more valuable when its value is higher
 	quality = (upper-lower)*weighted_scores**order_choices[k] + lower
+	# generate heatmap
+	if toSave:
+		hm = np.reshape(quality,(num_h,num_w))
+		# plt.imshow(hm, cmap='hot', interpolation='nearest')
+		# plt.savefig(f'samples/{counter:2}_heatmap.jpg')
+		fig, ax = plt.subplots()
+
+		im, cbar = heatmap(hm, [str(i) for i in range(num_h)],
+						 [str(i) for i in range(num_w)], ax=ax,
+		                   cmap="coolwarm", cbarlabel="Down-sampling rate")
+		texts = annotate_heatmap(im, valfmt="{x:.2f}")
+
+		fig.tight_layout()
+		plt.savefig(f'samples/{counter:2}_heatmap.jpg')
 
 	tile_sizes = [(int(np.rint((x2-x1)*r)),int(np.rint((y2-y1)*r))) for r,(x1,y1,x2,y2) in zip(quality,ROIs)]
 
@@ -301,66 +372,79 @@ def tile_disturber(image, C_param):
 			compressed_size += dsize[0]*dsize[1]
 			bgr_frame[y1:y2,x1:x2] = crop
 
-	feat_end = time.perf_counter()
-	# print(img_index,feat_end-feat_start)
-	return bgr_frame,compressed_size
+	end = time.perf_counter()
+	if toSave:
+		cv2.imwrite(f'samples/{counter:2}_compressed.jpg',bgr_frame)
+	return bgr_frame,compressed_size,end-start
 
 def JPEG2000(npimg,C_param):
 	comp_dir = 'compression/jpeg2000/'
 	tmp_dir = comp_dir + 'tmp/'
 	cv2.imwrite(tmp_dir+'origin.png',npimg)
 	osize = os.stat(tmp_dir+'origin.png').st_size
+	start = time.perf_counter()
 	comp_cmd = './'+comp_dir+'opj_compress -i '+tmp_dir+'origin.png -o '+tmp_dir+'compressed.j2k -r '+str(C_param)
 	subprocess.call(comp_cmd, shell=True)
-	csize = os.stat(tmp_dir+'compressed.j2k').st_size
 	decm_cmd = './'+comp_dir+'opj_decompress -i '+tmp_dir+'compressed.j2k -o '+tmp_dir+'decompressed.png -r '+str(C_param)
 	subprocess.call(decm_cmd, shell=True)
+	end = time.perf_counter()
 	lossy_image = cv2.imread(tmp_dir+'decompressed.png')
-	return lossy_image,osize,csize
+	assert(lossy_image is not None)
+	csize = os.stat(tmp_dir+'compressed.j2k').st_size
+	return lossy_image,osize,csize,end-start
 
 def JPEG(npimg,C_param):
+	start = time.perf_counter()
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
 	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)
 	csize = len(pickle.dumps(lossy_image, 0))
 	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
-	return lossy_image,osize,csize
+	end = time.perf_counter()
+	return lossy_image,osize,csize,end-start
 
-def PNG(npimg,C_param):
-	encode_param = [int(cv2.IMWRITE_PNG_COMPRESSION), C_param]
+def WebP(npimg,C_param):
+	start = time.perf_counter()
+	encode_param = [int(cv2.IMWRITE_WEBP_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
-	result, lossy_image = cv2.imencode('.png', npimg, encode_param)
+	result, lossy_image = cv2.imencode('.webp', npimg, encode_param)
 	csize = len(pickle.dumps(lossy_image, 0))
 	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
-	return lossy_image,osize,csize
+	end = time.perf_counter()
+	return lossy_image,osize,csize,end-start
 
 # define a class for transformation
 class Transformer:
-	def __init__(self,name):
+	def __init__(self,name,snapshot = False):
 		# need a dict as buffer to store transformed image of a range
 		self.name = name
+		self.snapshot = snapshot
+		self.counter = 0
+		self.time = []
 
 	def transform(self, image=None, C_param=None):
 		# need to recover images and print examples
 		# get JPEG lib
 		if self.name == 'JPEG':
 			# 0->100
-			rimage,osize,csize = JPEG(image,C_param)
+			rimage,osize,csize,t = JPEG(image,C_param)
 			self.original_size += osize
 			self.compressed_size += csize
 		elif self.name == 'JPEG2000':
-			rimage,osize,csize = JPEG2000(image,C_param)
+			rimage,osize,csize,t = JPEG2000(image,C_param)
 			self.original_size += osize
 			self.compressed_size += csize
-		elif self.name == 'PNG':
-			# 9->0
-			rimage,osize,csize = PNG(image,C_param)
+		elif self.name == 'WebP':
+			# 1-100
+			rimage,osize,csize,t = WebP(image,C_param)
 			self.original_size += osize
 			self.compressed_size += csize
 		else:	
 			self.original_size += image.shape[0]*image.shape[1]
-			rimage,comp_sz = tile_disturber(image, C_param)
+			rimage,comp_sz,t = tile_disturber(image, C_param, self.counter, self.snapshot)
 			self.compressed_size += comp_sz
+		self.counter += 1
+		self.time += [t]
 		return rimage
 
 	def reset(self):
@@ -370,6 +454,9 @@ class Transformer:
 	def get_compression_ratio(self):
 		assert(self.original_size>0)
 		return 1-1.0*self.compressed_size/self.original_size
+
+	def get_compression_time(self):
+		return np.mean(self.time),np.std(self.time)
 
 def test_dataloader():
 	from torchvision import datasets
