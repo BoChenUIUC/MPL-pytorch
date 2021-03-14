@@ -533,8 +533,8 @@ if __name__ == "__main__":
 	# configs2paretofront('MOBO',500)
 
 	# compute coverage, maybe also hypervolume?
-	comparePF(1000)
-	comparePF2()
+	# comparePF(1000)
+	# comparePF2()
 
 	# pareto_front_approx_mobo()
 
