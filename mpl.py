@@ -65,7 +65,7 @@ def setup_opt():
     parser.add_argument('--finetune-lr', default=1e-5, type=float, help='finetune learning late')
     parser.add_argument('--finetune-weight-decay', default=0, type=float, help='finetune weight decay')
     parser.add_argument('--finetune-momentum', default=0, type=float, help='finetune SGD Momentum')
-    parser.add_argument('--seed', default=None, type=int, help='seed for initializing training')
+    parser.add_argument('--seed', default=123, type=int, help='seed for initializing training')
     parser.add_argument('--label-smoothing', default=0, type=float, help='label smoothing alpha')
     parser.add_argument('--mu', default=7, type=int, help='coefficient of unlabeled batch size')
     parser.add_argument('--threshold', default=0.95, type=float, help='pseudo label threshold')

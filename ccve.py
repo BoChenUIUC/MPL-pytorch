@@ -322,11 +322,11 @@ def pareto_front_approx_mobo(comp_name,max_iter=1000):
 		sim = Simulator(train=True)
 		TF = Transformer(comp_name)
 		datarange = [0,100]
+		print('Iter:',d['iter'],x)
 		acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
 		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
 		d['acc_file'].write(str(float(acc))+'\n')
 		d['cr_file'].write(str(cr)+'\n')
-		print('Iter:',d['iter'])
 		d['iter'] += 1
 		return np.array([float(acc),cr])
 	Optimizer = mo.MOBayesianOpt(target=objective,
