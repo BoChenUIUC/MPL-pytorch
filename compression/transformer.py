@@ -355,11 +355,11 @@ def tile_encoder(image, C_param, counter, snapshot=False):
 	tile_size = tilew * tileh
 	for roi,dsize in zip(ROIs,tile_sizes):
 		x1,y1,x2,y2 = roi
+		crop = bgr_frame[y1:y2,x1:x2].copy()
+		original_size += len(pickle.dumps(crop, 0))
 		if dsize == (x2-x1,y2-y1):
 			compressed_size += (x2-x1)*(y2-y1)
 			continue
-		crop = bgr_frame[y1:y2,x1:x2].copy()
-		original_size += len(pickle.dumps(crop, 0))
 		if dsize[0]==0 or dsize[1]==0:
 			bgr_frame[y1:y2,x1:x2] = [0]
 		else:
