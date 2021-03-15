@@ -549,7 +549,7 @@ class Transformer:
 		elif self.name == 'WebP':
 			# 1-100
 			rimage,osize,csize,t = WebP(image,C_param)
-		elif self.name == 'TiledWebP' or 'TiledJPEG':
+		elif self.name == 'TiledWebP' or self.name == 'TiledJPEG':
 			rimage,osize,csize,t = advanced_tile_encoder(image, C_param, self.counter, self.name[5:], self.snapshot)
 		elif self.name == 'Tiled':	
 			rimage,osize,csize,t = tile_encoder(image, C_param, self.counter, self.snapshot)
