@@ -363,9 +363,15 @@ def tile_encoder(image, C_param, counter, snapshot=False):
 			bgr_frame[y1:y2,x1:x2] = [0]
 		else:
 			try:
-				original_size += len(pickle.dumps(crop, 0))
+				otsize = len(pickle.dumps(crop, 0))
+				if otsize == 0:
+					print(crop)
+					print(pickle.dumps(crop, 0))
+					exit(1)
+				original_size += otsize
 				crop_d = cv2.resize(crop, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-				compressed_size += len(pickle.dumps(crop_d, 0))
+				ctsize = len(pickle.dumps(crop_d, 0))
+				compressed_size += ctsize
 				crop = cv2.resize(crop_d, dsize=(x2-x1,y2-y1), interpolation=cv2.INTER_LINEAR)
 			except Exception as e:
 				print(repr(e))
