@@ -569,8 +569,8 @@ if __name__ == "__main__":
 	# pareto_front_approx_nsga2('Tiled')
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
-	# for comp_name in['Tiled','TiledWebP','TiledJPEG']:
-	# 	pareto_front_approx_mobo(comp_name,450)
+	for comp_name in['Tiled','TiledWebP','TiledJPEG']:
+		pareto_front_approx_mobo(comp_name,450)
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('MOBO',500)
@@ -579,6 +579,6 @@ if __name__ == "__main__":
 	# comparePF(1000)
 
 	# leave jpeg2000 for later
-	for name in ['JPEG','WebP']:#,'Tiled','TiledWebP','TiledJPEG']:
-		evaluation(name)
+	# for name in ['JPEG','WebP']:#,'Tiled','TiledWebP','TiledJPEG']:
+	# 	evaluation(name)
 
