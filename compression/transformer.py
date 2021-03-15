@@ -565,8 +565,11 @@ class Transformer:
 	def reset(self):
 		self.compressed_size = 0
 		self.original_size = 0
+		self.counter = 0
 
 	def get_compression_ratio(self):
+		if self.original_size<=0:
+			print(self.original_size,self.compressed_size,self.counter)
 		assert(self.original_size>0)
 		return 1-1.0*self.compressed_size/self.original_size
 
