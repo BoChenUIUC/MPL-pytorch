@@ -128,7 +128,7 @@ def get_dataloader(args,train=True):
         transforms.ToTensor(),
     ])
     test_dataset = datasets.CIFAR10(args.data_path, train=train, 
-                                    transform=transform_val, download=False)
+                                    transform=transform_val, download=True)
     test_loader = DataLoader(test_dataset,
                              sampler=SequentialSampler(test_dataset),
                              batch_size=args.batch_size,
