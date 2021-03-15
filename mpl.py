@@ -152,7 +152,7 @@ def get_model(args):
 
     if os.path.isfile(args.resume):
         print(f"=> loading checkpoint '{args.resume}'")
-        loc = f'cuda:{args.gpu}'
+        loc = f'cuda:{args.device}'
         checkpoint = torch.load(args.resume, map_location=loc)
         if checkpoint['avg_state_dict'] is not None:
             model_load_state_dict(student_model, checkpoint['avg_state_dict'])
