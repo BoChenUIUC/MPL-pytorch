@@ -10,7 +10,7 @@ from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
-from mpl import Simulator
+from yolov5 import Simulator
 import mobopt as mo
 # MOO
 from pymoo.algorithms.nsga2 import NSGA2
@@ -20,9 +20,7 @@ from pymoo.visualization.scatter import Scatter
 from pymoo.model.problem import Problem
 
 # setup
-classes_num = 24
 batch_size = 1
-print_step = 1
 eval_step = 1
 PATH = 'backup/rsnet.pth'
 
@@ -95,35 +93,10 @@ def comparePF(max_lines):
 			cov_file.write(str(pfs[i].area())+' '+str(pfs[i].uniformity())+' '+str(cov)+' ')
 		cov_file.write('\n')
 
-# for CCVE, 
-def comparePF2():
-	pf1 = ParetoFront("CCVE",10000)
-	pf2 = ParetoFront("JPEG",10000)
-	pf3 = ParetoFront("JPEG2000",10000)
-	eval_file1 = open('all_data/CCVE_eval.log')
-	eval_file2 = open('all_data/JPEG_eval.log')
-	eval_file3 = open('all_data/JPEG2000_eval.log')
-	pfs = [pf1,pf2,pf3]
-	files = [eval_file1,eval_file2,eval_file3]
-	for pf,file in zip(pfs,files):
-		for line in file.readlines():
-			line = line.strip().split(' ')
-			acc,cr = float(line[0]),float(line[1])
-			C_param = np.zeros(6)
-			pf.add(C_param,(acc,cr))
-	with open('all_eval.log','w',1) as f:
-		for i in range(3):
-			cov_best = pfs[0].cov(pfs[i])
-			cov_cur = pfs[i].cov(pfs[0])
-			f.write(str(pfs[i].area())+' '+str(pfs[i].uniformity())+' '+str(cov_best)+' '+str(cov_cur)+'\n' ) 
-
-
-
 class ParetoFront:
 	def __init__(self,name='RE',stopping_criterion=100):
 		self.stopping_criterion = stopping_criterion
 		self.reset()
-		self.pf_file = open(name+'_pf.log', "w", 1)
 
 	def reset(self):
 		print('Reset environment.')
@@ -181,7 +154,7 @@ class ParetoFront:
 		if add_new:
 			self.dominating_c_param += c_param
 			self.dominating_cnt += 1
-			angle = np.arctan(dp[1]/dp[0])
+			angle = dp[1]
 			# pre_score = self.uniformity()
 			self.data[dp] = (angle,c_param)
 			# cur_score = self.uniformity()
@@ -217,15 +190,16 @@ class ParetoFront:
 	def area(self):
 		# approximate area
 		area = 0
-		bot = 0
+		right = 1
 		for datapoint in self.data:
 			if datapoint in [(0,1),(1,0)]:continue
-			assert(datapoint[0]>=bot)
-			area += (datapoint[0]-bot)*(datapoint[1])
-			bot = datapoint[0]
+			assert(datapoint[1]<=right and 1>=datapoint[0])
+			area += (1 - datapoint[0])*(right-datapoint[1])
+			right = datapoint[1]
 		return area
 
 	def save(self):
+		self.pf_file = open(name+'_pf.log', "w", 1)
 		for k in self.data:
 			if k in [(0,1),(1,0)]:continue
 			self.pf_file.write(str(float(k[0]))+' '+str(k[1])+' '+' '.join([str(n) for n in self.data[k][1]])+'\n')
@@ -238,7 +212,7 @@ class ParetoFront:
 		return new_state
 
 class C_Generator:
-	def __init__(self,name='CCVE',explore=True):
+	def __init__(self,name='RL',explore=True):
 		MAX_BUFFER = 1000000
 		S_DIM = 12
 		A_DIM = 6
@@ -251,10 +225,13 @@ class C_Generator:
 		self.explore = explore
 
 	def get(self):
-		if self.name == 'CCVE':
+		if self.name == 'RL':
 			self.action = self._DDPG_action()
-		else:
+		elif self.name == 'RE':
 			self.action = self._RE_action()
+		else:
+			print(self.name,'not implemented.')
+			exit(1)
 		return self.action
 
 	def _DDPG_action(self):
@@ -271,10 +248,13 @@ class C_Generator:
 		return np.random.random(6)-0.5
 
 	def optimize(self, datapoint, done):
-		if self.name == 'CCVE':
+		if self.name == 'RL':
 			self._DDPG_optimize(datapoint, done)
 		elif self.name == 'RE':
 			self.paretoFront.add(self.action, datapoint)
+		else:
+			print(self.name,'not implemented.')
+			exit(1)
 
 	def _DDPG_optimize(self, datapoint, done):
 		# if one episode ends, do nothing
@@ -291,16 +271,16 @@ class C_Generator:
 			self.paretoFront.reset()
 
 # NAGA2
-def pareto_front_approx_nsga2():
+def pareto_front_approx_nsga2(comp_name):
 	class MyProblem(Problem):
 		def __init__(self):
 			super().__init__(n_var=6, n_obj=2, n_constr=0, xl=np.array([-.5]*6), xu=np.array([.5]*6))
 			self.sim = Simulator(train=True)
-			self.TF = Transformer('compression')
+			self.TF = Transformer(comp_name)
 			self.datarange = [0,100]
-			self.cfg_file = open('NSGA2_cfg.log', "w", 1)
-			self.acc_file = open('NSGA2_acc.log', "w", 1)
-			self.cr_file = open('NSGA2_cr.log', "w", 1)
+			self.cfg_file = open(comp_name+'_NSGA2_cfg.log', "w", 1)
+			self.acc_file = open(comp_name+'_NSGA2_acc.log', "w", 1)
+			self.cr_file = open(comp_name+'_NSGA2_cr.log', "w", 1)
 			self.iter = 0
 
 		def _evaluate(self, x, out, *args, **kwargs):
@@ -314,6 +294,7 @@ def pareto_front_approx_nsga2():
 				print('Iter:',self.iter)
 				self.iter += 1
 			out["F"] = np.array(points)
+	start = time.perf_counter()
 
 	problem = MyProblem()
 
@@ -324,22 +305,22 @@ def pareto_front_approx_nsga2():
 					('n_gen', 50),
 					seed=1,
 					verbose=False)
-
-	# plot = Scatter()
-	# plot.add(problem.pareto_front(), plot_type="line", color="black", alpha=0.7)
-	# plot.add(res.F, color="red")
-	# plot.show()
+    
+	end = time.perf_counter()
+	with open('NSGA_time.log','w',1) as f:
+		f.write(str(end-start)+'s')
 
 # PFA using MOBO
-def pareto_front_approx_mobo():
+def pareto_front_approx_mobo(comp_name):
+	start = time.perf_counter()
 	d = {}
-	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
-	d['acc_file'] = open('MOBO_acc.log', "w", 1)
-	d['cr_file'] = open('MOBO_cr.log', "w", 1)
+	d['cfg_file'] = open(comp_name+'_'+'MOBO_cfg.log', "w", 1)
+	d['acc_file'] = open(comp_name+'_'+'MOBO_acc.log', "w", 1)
+	d['cr_file'] = open(comp_name+'_'+'MOBO_cr.log', "w", 1)
 	d['iter'] = 0
 	def objective(x):
 		sim = Simulator(train=True)
-		TF = Transformer('compression')
+		TF = Transformer(comp_name)
 		datarange = [0,100]
 		acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
 		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
@@ -353,13 +334,15 @@ def pareto_front_approx_mobo():
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=50)
 	front, pop = Optimizer.maximize(n_iter=1000)
+	end = time.perf_counter()
+	with open('MOBO_time.log','w',1) as f:
+		f.write(str(end-start)+'s')
 
 # PFA
-def pareto_front_approx():
-	EXP_NAME = 'CCVE'
-	cfg_file = open(EXP_NAME+'_cfg.log', "w", 1)
-	acc_file = open(EXP_NAME+'_acc.log', "w", 1)
-	cr_file = open(EXP_NAME+'_cr.log', "w", 1)
+def pareto_front_approx(comp_name,EXP_NAME):
+	cfg_file = open(comp_name+'_'+EXP_NAME+'_cfg.log', "w", 1)
+	acc_file = open(comp_name+'_'+EXP_NAME+'_acc.log', "w", 1)
+	cr_file = open(comp_name+'_'+EXP_NAME+'_cr.log', "w", 1)
 
 	# test wigh 500 iter
 	start = time.perf_counter()
@@ -372,10 +355,11 @@ def pareto_front_approx():
 	datarange = [0,100]
 	print(EXP_NAME,'num configs:',num_cfg, 'total batches:', sim.num_batches)
 
-	TF = Transformer('compression')
+	TF = Transformer(comp_name)
 	# the pareto front can be restarted, need to try
 
 	for bi in range(num_cfg):
+		print(bi)
 		# DDPG-based generator
 		C_param = cgen.get()
 		# apply the compression param chosen by the generator
@@ -388,7 +372,8 @@ def pareto_front_approx():
 		cr_file.write(str(cr)+'\n')
 	# test wigh 500 iter
 	end = time.perf_counter()
-	print('Profiling time:',end-start)
+	with open(EXP_NAME+'_time.log','w',1) as f:
+		f.write(str(end-start)+'s')
 
 # input: pf file/JPEG/JPEG2000
 # output: pf file on test
@@ -401,18 +386,47 @@ def evaluation(EXP_NAME):
 	datarange = [0,sim.num_batches]
 	eval_file = open(EXP_NAME+'_eval.log', "w", 1)
 
-	if EXP_NAME == 'CCVE':
-		with open('MOBO_pf.log','r') as f:
+	if EXP_NAME in ['Tiled', 'TiledWebP', 'TiledJPEG']:
+		with open(EXP_NAME+'_MOBO_pf.log','r') as f:
 			for line in f.readlines():
 				tmp = line.strip().split(' ')
 				acc,cr = float(tmp[0]),float(tmp[1])
 				C_param = np.array([float(n) for n in tmp[2:]])
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
-				eval_file.write(f"{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
+				eval_file.write("f{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
 	else:
 		for i in range(101):
+			print(EXP_NAME,i)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
-			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
+			eval_file.write("f{acc:.3f} {cr:.3f}\n")
+			if EXP_NAME=='JPEG2000' and i==5:break
+
+def speed_test(EXP_NAME):
+	np.random.seed(123)
+	torch.manual_seed(2)
+
+	sim = Simulator(train=False)
+	TF = Transformer(name=EXP_NAME)
+	datarange = [66,70]
+	selected_ranges = [17,35,57,77,129]
+	eval_file = open(EXP_NAME+'_spdtest.log', "w", 1)
+
+	if EXP_NAME == 'CCVE':
+		with open('MOBO_pf.log','r') as f:
+			for lidx,line in enumerate(f.readlines()):
+				if lidx not in selected_ranges:continue
+				tmp = line.strip().split(' ')
+				acc,cr = float(tmp[0]),float(tmp[1])
+				C_param = np.array([float(n) for n in tmp[2:]])
+				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
+	else:
+		rate_ranges = [5,12,23,56,100] if EXP_NAME=='JPEG' else [0,1,2,3,4,5]
+		for r in rate_ranges:
+			print(EXP_NAME,r)
+			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=r)
+		print(TF.get_compression_time())
+	m,s = TF.get_compression_time()
+	eval_file.write(f"{m:.3f} {s:.3f}\n")
 
 # determine sample size
 def test_run():
@@ -430,7 +444,7 @@ def test_run():
 	selected_ranges = [10*i for i in range(1,10)]+[100*i for i in range(1,8)]+[782]
 	print('Num batches:',num_cfg,sim.num_batches)
 
-	TF = Transformer('compression')
+	TF = Transformer('Tiled')
 	# the pareto front can be restarted, need to try
 
 	for bi in range(num_cfg):
@@ -444,6 +458,25 @@ def test_run():
 		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
 		acc_file.write(' '.join([str(n) for n in map50s])+'\n')
 		cr_file.write(' '.join([str(n) for n in crs])+'\n')
+
+def generate_image_samples(EXP_NAME):
+	sim = Simulator(train=False)
+	TF = Transformer(name=EXP_NAME,snapshot=False)
+	datarange = [0,1]#sim.num_batches]
+	selected_lines = [50,110]
+	# replace pf file later
+	with open('MOBO_pf.log','r') as f:
+		for lcnt,line in enumerate(f.readlines()):
+			if lcnt not in selected_lines:
+				continue
+			tmp = line.strip().split(' ')
+			acc,cr = float(tmp[0]),float(tmp[1])
+			C_param = np.array([float(n) for n in tmp[2:]])
+			acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
+			print(acc1,cr1)
+			break
+	m,s = TF.get_compression_time()
+	print(m,s)
 
 def dual_train(net):
 	np.random.seed(123)
@@ -461,7 +494,7 @@ def dual_train(net):
 
 	for epoch in range(10):
 		running_loss = 0.0
-		TF = Transformer('compression')
+		TF = Transformer('Tiled')
 		# the pareto front can be restarted, need to try
 
 		for bi in range(num_cfg):
@@ -518,29 +551,34 @@ def dual_train(net):
 if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
-	# prepare network
-	# net = RSNet()
-	# net.load_state_dict(torch.load('backup/rsnet.pth'))
-	# net = net.cuda()
+
+	# samples for eval
+	# generate_image_samples('TiledWebP')
+
+	# speed test
+	# for name in ['CCVE','JPEG','JPEG2000']:
+	# 	speed_test(name)
 
 	# determine lenght of episode
 	# test_run()
 
-	# use ddpg or re for approx
-	# pareto_front_approx()
+	# find out best optimizer
+	# pareto_front_approx('Tiled',"RL")
+	# pareto_front_approx('Tiled',"RE")
+	# pareto_front_approx_mobo('Tiled')
+	# pareto_front_approx_nsga2('Tiled')
+
+	# profiling for Tiled, TiledWebP, TiledJPEG
+	for comp_name in['Tiled','TiledWebP','TiledJPEG']:
+		pareto_front_approx_mobo(comp_name)
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('MOBO',500)
 
-	# compute coverage, maybe also hypervolume?
+	# compute eval metrics
 	# comparePF(1000)
-	# comparePF2()
 
-	# pareto_front_approx_mobo()
-
-	# pareto_front_approx_nsga2()
-
-	# 'CCVE','JPEG','JPEG2000',
-	for name in ['WebP']:
-		evaluation(name)
+	# leave jpeg2000 for later
+	# for name in ['JPEG','WebP','Tiled','TiledWebP','TiledJPEG']:
+	# 	evaluation(name)
 
