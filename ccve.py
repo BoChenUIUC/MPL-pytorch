@@ -85,7 +85,7 @@ def comparePF(max_lines):
 	points_list = [config2points('all_data/'+name) for name in names]
 	cov_file = open('compare_pf.log', "w", 1)
 	for lidx in range(max_lines):
-		for i in range(4):
+		for i in range(len(names)):
 			pfs[i].add(*points_list[i][lidx])
 			cov_best = pfs[0].cov(pfs[i])
 			cov_cur = pfs[i].cov(pfs[0])
@@ -97,6 +97,7 @@ class ParetoFront:
 	def __init__(self,name='RE',stopping_criterion=100):
 		self.stopping_criterion = stopping_criterion
 		self.reset()
+		self.name = name
 
 	def reset(self):
 		print('Reset environment.')
@@ -199,7 +200,7 @@ class ParetoFront:
 		return area
 
 	def save(self):
-		self.pf_file = open(name+'_pf.log', "w", 1)
+		self.pf_file = open(self.name+'_pf.log', "w", 1)
 		for k in self.data:
 			if k in [(0,1),(1,0)]:continue
 			self.pf_file.write(str(float(k[0]))+' '+str(k[1])+' '+' '.join([str(n) for n in self.data[k][1]])+'\n')
@@ -569,16 +570,17 @@ if __name__ == "__main__":
 	# pareto_front_approx_nsga2('Tiled')
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
-	for comp_name in['Tiled','TiledWebP','TiledJPEG']:
-		pareto_front_approx_mobo(comp_name,450)
+	# for comp_name in['Tiled','TiledWebP','TiledJPEG']:
+	# 	pareto_front_approx_mobo(comp_name,450)
 
 	# convert from .log file to pf for eval
-	# configs2paretofront('MOBO',500)
+	# configs2paretofront('Tiled_MOBO',500)
+	# configs2paretofront('TiledWebP_MOBO',500)
 
 	# compute eval metrics
 	# comparePF(1000)
 
 	# leave jpeg2000 for later
-	# for name in ['JPEG','WebP']:#,'Tiled','TiledWebP','TiledJPEG']:
-	# 	evaluation(name)
+	for name in ['Tiled','TiledWebP']:
+		evaluation(name)
 
