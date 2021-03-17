@@ -550,8 +550,8 @@ def dual_train(net):
 		torch.save(net.state_dict(), PATH)
 
 if __name__ == "__main__":
-	np.random.seed(13)
-	torch.manual_seed(42)
+	np.random.seed(213)
+	torch.manual_seed(442)
 
 	# samples for eval
 	# generate_image_samples('TiledWebP')
@@ -571,7 +571,7 @@ if __name__ == "__main__":
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	for comp_name in['Tiled']:#,'TiledWebP','TiledJPEG']:
-		pareto_front_approx_mobo(comp_name,950)
+		pareto_front_approx_mobo(comp_name,450)
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('Tiled_MOBO',500)
