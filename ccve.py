@@ -273,6 +273,7 @@ class C_Generator:
 
 # NAGA2
 def pareto_front_approx_nsga2(comp_name):
+	print(comp_name,'NSGA II')
 	class MyProblem(Problem):
 		def __init__(self):
 			super().__init__(n_var=6, n_obj=2, n_constr=0, xl=np.array([-.5]*6), xu=np.array([.5]*6))
@@ -461,10 +462,10 @@ def test_run():
 		cr_file.write(' '.join([str(n) for n in crs])+'\n')
 
 def generate_image_samples(EXP_NAME):
-	sim = Simulator(train=False)
-	TF = Transformer(name=EXP_NAME,snapshot=False)
+	sim = Simulator(train=True)
+	TF = Transformer(name=EXP_NAME,snapshot=True)
 	datarange = [0,1]#sim.num_batches]
-	selected_lines = [50,110]
+	selected_lines = [60,130]
 	# replace pf file later
 	with open('MOBO_pf.log','r') as f:
 		for lcnt,line in enumerate(f.readlines()):
@@ -474,7 +475,7 @@ def generate_image_samples(EXP_NAME):
 			acc,cr = float(tmp[0]),float(tmp[1])
 			C_param = np.array([float(n) for n in tmp[2:]])
 			acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
-			print(acc1,cr1)
+			print(acc1,cr1,C_param)
 			break
 	m,s = TF.get_compression_time()
 	print(m,s)
@@ -550,37 +551,39 @@ def dual_train(net):
 		torch.save(net.state_dict(), PATH)
 
 if __name__ == "__main__":
-	np.random.seed(213)
-	torch.manual_seed(442)
+	np.random.seed(123)
+	torch.manual_seed(2)
 
 	# samples for eval
-	# generate_image_samples('TiledWebP')
+	# generate_image_samples('Tiled')
 
 	# speed test
 	# for name in ['CCVE','JPEG','JPEG2000']:
 	# 	speed_test(name)
 
-	# determine lenght of episode
+	# 1. determine lenght of episode
 	# test_run()
 
-	# find out best optimizer
+	# 2. find out best optimizer
 	# pareto_front_approx('Tiled',"RL")
 	# pareto_front_approx('Tiled',"RE")
 	# pareto_front_approx_mobo('Tiled')
 	# pareto_front_approx_nsga2('Tiled')
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
-	for comp_name in['Tiled']:#,'TiledWebP','TiledJPEG']:
+	# change iters to 500
+	for comp_name in['Tiled']:
 		pareto_front_approx_mobo(comp_name,450)
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('Tiled_MOBO',500)
-	# configs2paretofront('TiledWebP_MOBO',500)
 
 	# compute eval metrics
 	# comparePF(1000)
 
 	# leave jpeg2000 for later
-	# for name in ['Tiled','TiledWebP']:
+	# former two can be evaluated directly without profile
+	# for name in ['JPEG','WebP']:
 	# 	evaluation(name)
 
+ 
