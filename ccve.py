@@ -80,7 +80,7 @@ def configs2paretofront(EXP_NAME,max_points):
 	pf.save()
 
 def comparePF(max_lines):
-	names = ['MOBO','NSGA2','RL','RE']
+	names = ['Tiled_MOBO','Tiled_NSGA2','Tiled_RL','Tiled_RE']
 	pfs = [ParetoFront(name,10000) for name in names]
 	points_list = [config2points('all_data/'+name) for name in names]
 	cov_file = open('compare_pf.log', "w", 1)
@@ -388,7 +388,7 @@ def evaluation(EXP_NAME):
 	datarange = [0,sim.num_batches]
 	eval_file = open(EXP_NAME+'_eval.log', "w", 1)
 
-	if EXP_NAME in ['Tiled', 'TiledWebP', 'TiledJPEG']:
+	if EXP_NAME in ['Tiled', 'TiledLegacy']:
 		with open(EXP_NAME+'_MOBO_pf.log','r') as f:
 			for line in f.readlines():
 				tmp = line.strip().split(' ')
@@ -575,15 +575,15 @@ if __name__ == "__main__":
 	# for comp_name in['Tiled']:
 	# 	pareto_front_approx_mobo(comp_name,450)
 
+	# compute eval metrics
+	# comparePF(500)
+
 	# convert from .log file to pf for eval
 	# configs2paretofront('Tiled_MOBO',500)
 
-	# compute eval metrics
-	# comparePF(1000)
-
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['JPEG','WebP']:
+	for name in ['Tiled']:
 		evaluation(name)
 
  

@@ -265,6 +265,121 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
 
 	return texts
 
+def tile_legacy(image, C_param, counter, snapshot=False):
+	start = time.perf_counter()
+	toSave = snapshot and counter<5
+	# analyze features in image
+	bgr_frame = np.array(image)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:2}_origin.jpg',bgr_frame)
+	# harris corner
+	# hc, _ = get_harris_corner(bgr_frame)
+	# FAST
+	fast = get_FAST(bgr_frame)
+	# STAR
+	star = get_STAR(bgr_frame)
+	# ORB
+	orb = get_ORB(bgr_frame)
+
+	point_features = [fast, star, orb]
+	map_features = []
+	num_features = len(point_features) + len(map_features)
+	# snapshot features optionally
+	if toSave:
+		feature_frame = np.zeros(bgr_frame.shape)
+		colors = [(72, 31, 219),(112, 70, 28),(168, 182, 33)]
+		for points,color in zip(point_features,colors):
+			for px,py in points:
+				feature_frame = cv2.circle(feature_frame, (int(px),int(py)), radius=2, color=color, thickness=-1)
+		cv2.imwrite(f'samples/{counter:2}_feature.jpg',feature_frame)
+	# divide image to 4*3 tiles
+	ROIs = []
+	num_w, num_h = 4,3
+	img_h,img_w = bgr_frame.shape[:2]
+	tilew,tileh = img_w//num_w,img_h//num_h
+	if img_w%num_w != 0:tilew += 1
+	if img_h%num_h != 0:tileh += 1
+	for row in range(num_h):
+		for col in range(num_w):
+			x1 = col*tilew; x2 = min((col+1)*tilew,img_w); y1 = row*tileh; y2 = min((row+1)*tileh,img_h)
+			ROIs.append([x1,y1,x2,y2])
+	counts = np.zeros((num_w*num_h,num_features))
+	for roi_idx,ROI in enumerate(ROIs):
+		feat_idx = 0
+		for mf in map_features:
+			c = count_mask_in_ROI(ROI,mf)
+			counts[roi_idx,feat_idx] = c
+			feat_idx += 1
+		for pf in point_features:
+			c = count_point_in_ROI(ROI,pf)
+			counts[roi_idx,feat_idx] = c
+			feat_idx += 1
+
+	# weight of different features
+	weights = C_param[:num_features] + 0.5
+	# lower and upper
+	lower,upper = C_param[num_features:num_features+2] + 0.5
+	lower,upper = min(lower,upper),max(lower,upper)
+	lower = max(lower,0);upper = min(upper,1)
+	# order to adjust the concentration of the  scores
+	k = int(((C_param[num_features+2]+0.5)*5))
+	k = min(k,4); k = max(k,0)
+	order_choices = [1./3,1./2,1,2,3]
+	# score of each feature sum to 1
+	normalized_score = counts/(np.sum(counts,axis=0)+1e-6)
+	weights /= (np.sum(weights)+1e-6)
+	# ws of all tiles sum up to 1
+	weighted_scores = np.matmul(normalized_score,weights)
+	# the weight is more valuable when its value is higher
+	quality = (upper-lower)*weighted_scores**order_choices[k] + lower
+	# generate heatmap
+	if toSave:
+		hm = np.reshape(quality,(num_h,num_w))
+		# plt.imshow(hm, cmap='hot', interpolation='nearest')
+		# plt.savefig(f'samples/{counter:2}_heatmap.jpg')
+		fig, ax = plt.subplots()
+
+		im, cbar = heatmap(hm, [str(i) for i in range(num_h)],
+						 [str(i) for i in range(num_w)], ax=ax,
+		                   cmap="coolwarm", cbarlabel="Down-sampling rate")
+		texts = annotate_heatmap(im, valfmt="{x:.2f}")
+
+		fig.tight_layout()
+		plt.savefig(f'samples/{counter:2}_heatmap.jpg')
+
+	tile_sizes = [(int(np.rint((x2-x1)*r)),int(np.rint((y2-y1)*r))) for r,(x1,y1,x2,y2) in zip(quality,ROIs)]
+
+	# not used for training,but can be used for 
+	# ploting the pareto front
+	compressed_size = 0
+	original_size = 0
+	tile_size = tilew * tileh
+	for roi,dsize in zip(ROIs,tile_sizes):
+		x1,y1,x2,y2 = roi
+		crop = bgr_frame[y1:y2,x1:x2].copy()
+		original_size += len(pickle.dumps(crop, 0))
+		if dsize == (x2-x1,y2-y1):
+			compressed_size += len(pickle.dumps(crop, 0))
+			continue
+		if dsize[0]==0 or dsize[1]==0:
+			bgr_frame[y1:y2,x1:x2] = [0]
+		else:
+			try:
+				crop_d = cv2.resize(crop, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+				compressed_size += len(pickle.dumps(crop_d, 0))
+				crop = cv2.resize(crop_d, dsize=(x2-x1,y2-y1), interpolation=cv2.INTER_LINEAR)
+			except Exception as e:
+				print(repr(e))
+				print(C_param,tile_sizes)
+				print('dsize:',dsize,crop.shape)
+				exit(1)
+			bgr_frame[y1:y2,x1:x2] = crop
+
+	end = time.perf_counter()
+	if toSave:
+		cv2.imwrite(f'samples/{counter:2}_compressed.jpg',bgr_frame)
+	return bgr_frame,original_size,compressed_size,end-start
+
 def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	start = time.perf_counter()
 	toSave = snapshot and counter<5
@@ -416,12 +531,12 @@ class Transformer:
 		self.snapshot = snapshot
 		self.counter = 0
 		self.time = []
-		self.jpeg = TurboJPEG()
 
 	def transform(self, image=None, C_param=None):
 		# need to recover images and print examples
 		# get JPEG lib
 		if self.name == 'JPEG':
+			self.jpeg = TurboJPEG()
 			# 0->100
 			rimage,osize,csize,t = TUBBOJPEG(image,C_param,self.jpeg)
 		elif self.name == 'JPEG2000':
@@ -429,7 +544,10 @@ class Transformer:
 		elif self.name == 'WebP':
 			# 1-100
 			rimage,osize,csize,t = WebP(image,C_param)
+		elif self.name == 'TiledLegacy':
+			rimage,osize,csize,t = tile_legacy(image, C_param, self.counter, self.snapshot)
 		elif self.name == 'Tiled':	
+			self.jpeg = TurboJPEG()
 			rimage,osize,csize,t = tile_encoder(image, C_param, self.jpeg, self.counter, self.snapshot)
 		else:
 			print(self.name,'not implemented.')
