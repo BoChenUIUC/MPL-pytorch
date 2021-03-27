@@ -206,11 +206,11 @@ def heatmap(data, row_labels, col_labels, ax=None,
 	cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
 
 	# We want to show all ticks...
-	ax.set_xticks(np.arange(data.shape[1]))
-	ax.set_yticks(np.arange(data.shape[0]))
+	# ax.set_xticks(np.arange(data.shape[1]))
+	# ax.set_yticks(np.arange(data.shape[0]))
 	# ... and label them with the respective list entries.
-	ax.set_xticklabels(col_labels)
-	ax.set_yticklabels(row_labels)
+	# ax.set_xticklabels(col_labels)
+	# ax.set_yticklabels(row_labels)
 
 	# Let the horizontal axes labeling appear on top.
 	ax.tick_params(top=True, bottom=False,
@@ -221,13 +221,13 @@ def heatmap(data, row_labels, col_labels, ax=None,
 					rotation_mode="anchor")
 
 	# Turn spines off and create white grid.
-	for edge, spine in ax.spines.items():
-		spine.set_visible(False)
+	# for edge, spine in ax.spines.items():
+	# 	spine.set_visible(False)
 
-	ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
-	ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
-	ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
-	ax.tick_params(which="minor", bottom=False, left=False)
+	# ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+	# ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+	# ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+	# ax.tick_params(which="minor", bottom=False, left=False)
 
 	return im, cbar
 
@@ -382,12 +382,12 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 
 def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	start = time.perf_counter()
-	toSave = snapshot and counter<5
+	toSave = snapshot and counter<16
 	# analyze features in image
 	bgr_frame = np.array(image)
 	bgr_frame = np.ascontiguousarray(bgr_frame)
 	if toSave:
-		cv2.imwrite(f'samples/{counter:2}_origin.jpg',bgr_frame)
+		cv2.imwrite(f'samples/{counter:02}_origin.jpg',bgr_frame)
 	# harris corner
 	# hc, _ = get_harris_corner(bgr_frame)
 	# FAST
@@ -402,11 +402,11 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	# snapshot features optionally
 	if toSave:
 		feature_frame = np.zeros(bgr_frame.shape)
-		colors = [(72, 31, 219),(112, 70, 28),(168, 182, 33)]
+		colors = [(72, 31, 219),(89, 152, 26),(255, 150, 54)]
 		for points,color in zip(point_features,colors):
 			for px,py in points:
 				feature_frame = cv2.circle(feature_frame, (int(px),int(py)), radius=2, color=color, thickness=-1)
-		cv2.imwrite(f'samples/{counter:2}_feature.jpg',feature_frame)
+		cv2.imwrite(f'samples/{counter:02}_feature.jpg',feature_frame)
 	
 	# divide image to 4*3 tiles
 	img_h,img_w = bgr_frame.shape[:2]
@@ -445,17 +445,18 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	# generate heatmap
 	if toSave:
 		hm = np.reshape(quality,(heightInBlock,widthInBlock))
+		hm = np.repeat(hm,2,axis=1)
 		# plt.imshow(hm, cmap='hot', interpolation='nearest')
 		# plt.savefig(f'samples/{counter:2}_heatmap.jpg')
 		fig, ax = plt.subplots()
 
 		im, cbar = heatmap(hm, [str(i) for i in range(heightInBlock)],
 						 [str(i) for i in range(widthInBlock)], ax=ax,
-		                   cmap="coolwarm", cbarlabel="Down-sampling rate")
+		                   cmap="coolwarm")
 		# texts = annotate_heatmap(im, valfmt="{x:.2f}")
 
 		fig.tight_layout()
-		plt.savefig(f'samples/{counter:2}_heatmap.jpg')
+		plt.savefig(f'samples/{counter:02}_heatmap.jpg')
 
 	original_size = len(pickle.dumps(bgr_frame, 0))
 	feature_encoding = np.clip(np.rint(quality*100),1,100).astype(np.uint8)
@@ -465,7 +466,7 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	end = time.perf_counter()
 	bgr_frame = jpeg.decode(jpegraw,feature_encoding)
 	if toSave:
-		cv2.imwrite(f'samples/{counter:2}_compressed.jpg',bgr_frame)
+		cv2.imwrite(f'samples/{counter:02}_compressed.jpg',bgr_frame)
 	return bgr_frame,original_size,compressed_size,end-start
 
 def JPEG2000(npimg,C_param):
@@ -476,11 +477,12 @@ def JPEG2000(npimg,C_param):
 	start = time.perf_counter()
 	comp_cmd = './'+comp_dir+'opj_compress -i '+tmp_dir+'origin.png -o '+tmp_dir+'compressed.j2k -r '+str(C_param)
 	subprocess.call(comp_cmd, shell=True)
+	end = time.perf_counter()
 	decm_cmd = './'+comp_dir+'opj_decompress -i '+tmp_dir+'compressed.j2k -o '+tmp_dir+'decompressed.png -r '+str(C_param)
 	subprocess.call(decm_cmd, shell=True)
-	end = time.perf_counter()
 	lossy_image = cv2.imread(tmp_dir+'decompressed.png')
 	assert(lossy_image is not None)
+	lossy_image = cv2.resize(lossy_image, dsize=(npimg.shape[1],npimg.shape[0]), interpolation=cv2.INTER_LINEAR)
 	csize = os.stat(tmp_dir+'compressed.j2k').st_size
 	return lossy_image,osize,csize,end-start
 
@@ -496,8 +498,8 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 	q = max(C_param,1)
 	q = min(C_param,100)
 	osize = len(pickle.dumps(bgr_frame, 0))
-	feature_encoding = np.ones(widthInBlock*heightInBlock,dtype=np.uint8)*90
-	jpegraw = jpeg.encode(bgr_frame,feature_encoding)
+	feature_encoding = np.zeros(widthInBlock*heightInBlock,dtype=np.uint8)*q
+	jpegraw = jpeg.encode(bgr_frame,feature_encoding,q)
 	csize = len(jpegraw)
 	end = time.perf_counter()
 	lossy_image = jpeg.decode(jpegraw,feature_encoding)
@@ -539,6 +541,7 @@ class Transformer:
 			self.jpeg = TurboJPEG()
 			# 0->100
 			rimage,osize,csize,t = TUBBOJPEG(image,C_param,self.jpeg)
+			# rimage,osize,csize,t = JPEG(image,C_param)
 		elif self.name == 'JPEG2000':
 			rimage,osize,csize,t = JPEG2000(image,C_param)
 		elif self.name == 'WebP':

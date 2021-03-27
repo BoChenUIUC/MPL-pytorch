@@ -10,7 +10,7 @@ from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
-from mpl import Simulator
+from app import Simulator
 import mobopt as mo
 # MOO
 from pymoo.algorithms.nsga2 import NSGA2
@@ -78,6 +78,22 @@ def configs2paretofront(EXP_NAME,max_points):
 		cnt += 1
 		if cnt == max_points:break
 	pf.save()
+
+def eval_metrics():
+	names = ['Tiled','JPEG','JPEG2000','WebP']
+	pfs = [ParetoFront(name,10000) for name in names]
+	for ei,exp in enumerate(names):
+		filename = 'all_data/' + exp + '_eval.log'
+		with open(filename,'r') as f:
+			for line in f.readlines():
+				line = line.strip().split(' ')
+				acc,cr = float(line[0]),float(line[1])
+				pfs[ei].add(np.zeros(6),(acc,cr))
+	for pf in pfs:
+		print(pf.area(0),pf.area(0.4),pf.uniformity())
+		for pf2 in pfs:
+			print(pf.cov(pf2))
+
 
 def comparePF(max_lines):
 	names = ['Tiled_MOBO','Tiled_NSGA2','Tiled_RL','Tiled_RE']
@@ -172,10 +188,10 @@ class ParetoFront:
 	def cov(self,other):
 		covered = 0.0
 		for dp1 in other.data:
-			if dp1 in [(0,1),(1,0)]:continue
+			# if dp1 in [(0,1),(1,0)]:continue
 			dominated = False
 			for dp2 in self.data:
-				if dp2 in [(0,1),(1,0)]:continue
+				# if dp2 in [(0,1),(1,0)]:continue
 				if dp2[0]>dp1[0] and dp2[1]>dp1[1]:
 					dominated = True
 					break
@@ -188,15 +204,16 @@ class ParetoFront:
 		angle_diff = np.diff(angle_arr)
 		return 1/(np.std(angle_diff)/np.mean(angle_diff)/len(angle_diff))
 
-	def area(self):
-		# approximate area
+	def area(self,ref=0):
+		# approximate area (accuracy,cr)
 		area = 0
-		right = 1
+		bot = ref
 		for datapoint in self.data:
 			if datapoint in [(0,1),(1,0)]:continue
-			assert(datapoint[1]<=right and 1>=datapoint[0])
-			area += (1 - datapoint[0])*(right-datapoint[1])
-			right = datapoint[1]
+			if datapoint[0]<bot:continue
+			assert(datapoint[0]>=bot and 0<=datapoint[1])
+			area += (datapoint[0]-bot)*(datapoint[1])
+			bot = datapoint[0]
 		return area
 
 	def save(self):
@@ -304,7 +321,7 @@ def pareto_front_approx_nsga2(comp_name):
 
 	res = minimize(problem,
 					algorithm,
-					('n_gen', 50),
+					('n_gen', 25),
 					seed=1,
 					verbose=False)
     
@@ -353,7 +370,7 @@ def pareto_front_approx(comp_name,EXP_NAME):
 	# so that we only do this once
 	sim = Simulator(train=True)
 	cgen = C_Generator(name=EXP_NAME,explore=True)
-	num_cfg = 1000 # number of cfgs to be explored
+	num_cfg = 500 # number of cfgs to be explored
 	datarange = [0,100]
 	print(EXP_NAME,'num configs:',num_cfg, 'total batches:', sim.num_batches)
 
@@ -390,18 +407,21 @@ def evaluation(EXP_NAME):
 
 	if EXP_NAME in ['Tiled', 'TiledLegacy']:
 		with open(EXP_NAME+'_MOBO_pf.log','r') as f:
-			for line in f.readlines():
+			for line in f.readlines()[::-1]:
 				tmp = line.strip().split(' ')
 				acc,cr = float(tmp[0]),float(tmp[1])
 				C_param = np.array([float(n) for n in tmp[2:]])
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
 				eval_file.write(f"{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
+	elif EXP_NAME == 'RAW':
+		acc,cr = sim.get_one_point(datarange, TF=None, C_param=None)
+		eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 	else:
 		for i in range(101):
 			print(EXP_NAME,i)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
 			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
-			if EXP_NAME=='JPEG2000' and i==5:break
+			# if EXP_NAME=='JPEG2000' and i==5:break
 
 def speed_test(EXP_NAME):
 	np.random.seed(123)
@@ -410,23 +430,31 @@ def speed_test(EXP_NAME):
 	sim = Simulator(train=False)
 	TF = Transformer(name=EXP_NAME)
 	datarange = [66,70]
-	selected_ranges = [17,35,57,77,129]
 	eval_file = open(EXP_NAME+'_spdtest.log', "w", 1)
 
-	if EXP_NAME == 'CCVE':
-		with open('MOBO_pf.log','r') as f:
+	if EXP_NAME in ['Tiled','TiledLegacy']:
+		if EXP_NAME == 'Tiled':
+			selected_ranges = [32,42,51,58,72,197]
+		else:
+			selected_ranges = [50, 58, 69, 85, 108,170]
+		with open(EXP_NAME+'_MOBO_pf.log','r') as f:
 			for lidx,line in enumerate(f.readlines()):
 				if lidx not in selected_ranges:continue
+				print(EXP_NAME,lidx)
 				tmp = line.strip().split(' ')
 				acc,cr = float(tmp[0]),float(tmp[1])
 				C_param = np.array([float(n) for n in tmp[2:]])
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
 	else:
-		rate_ranges = [5,12,23,56,100] if EXP_NAME=='JPEG' else [0,1,2,3,4,5]
+		if EXP_NAME == 'JPEG':
+			rate_ranges = [7,11,15,21,47,100]
+		elif EXP_NAME == 'JPEG2000':
+			rate_ranges = range(6)
+		elif EXP_NAME == 'WebP':
+			rate_ranges = [0,5,37,100]
 		for r in rate_ranges:
 			print(EXP_NAME,r)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=r)
-		print(TF.get_compression_time())
 	m,s = TF.get_compression_time()
 	eval_file.write(f"{m:.3f} {s:.3f}\n")
 
@@ -465,9 +493,9 @@ def generate_image_samples(EXP_NAME):
 	sim = Simulator(train=True)
 	TF = Transformer(name=EXP_NAME,snapshot=True)
 	datarange = [0,1]#sim.num_batches]
-	selected_lines = [60,130]
+	selected_lines = [92,152]
 	# replace pf file later
-	with open('MOBO_pf.log','r') as f:
+	with open(EXP_NAME+'_MOBO_pf.log','r') as f:
 		for lcnt,line in enumerate(f.readlines()):
 			if lcnt not in selected_lines:
 				continue
@@ -558,7 +586,7 @@ if __name__ == "__main__":
 	# generate_image_samples('Tiled')
 
 	# speed test
-	# for name in ['CCVE','JPEG','JPEG2000']:
+	# for name in ['Tiled']:
 	# 	speed_test(name)
 
 	# 1. determine lenght of episode
@@ -566,9 +594,9 @@ if __name__ == "__main__":
 
 	# 2. find out best optimizer
 	# pareto_front_approx('Tiled',"RL")
-	# pareto_front_approx('Tiled',"RE")
+	pareto_front_approx('Tiled',"RE")
 	# pareto_front_approx_mobo('Tiled')
-	# pareto_front_approx_nsga2('Tiled')
+	pareto_front_approx_nsga2('Tiled')
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
@@ -583,7 +611,10 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['Tiled']:
-		evaluation(name)
+	# for name in ['Tiled']:
+	# 	evaluation(name)
+
+	# caculate metrics
+	# eval_metrics()
 
  
