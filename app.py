@@ -297,9 +297,9 @@ class TwoLayer(nn.Module):
 
     def forward(self, x):
         x = self.pool(F.relu(self.bn1(self.conv1(x))))
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = (F.relu(self.bn2(self.conv2(x))))
         x = self.pool(F.relu(self.bn3(self.conv3(x))))
-        x = self.pool(F.relu(self.bn4(self.conv4(x))))
+        x = (F.relu(self.bn4(self.conv4(x))))
         x = self.pool(((self.conv5(x))))
         x = x.view(x.size(0), -1)
         # x = F.tanh(x)
@@ -315,7 +315,7 @@ def disturb_main():
         net = net.cuda()
     # net.load_state_dict(torch.load(PATH,map_location='cpu'))
     # net.eval()
-    
+
     # for i in range(10):
     #     s = time.perf_counter()
     #     print(net(torch.randn(1, 3, 32, 32)).shape)
