@@ -312,7 +312,6 @@ class ComplexModel(nn.Module):
         self.lrelu7 = nn.LeakyReLU()
 
         self.conv8 = nn.Conv2d(196, 1, kernel_size=3, stride=2, padding=1)
-        self.ln8 = nn.LayerNorm([1,4,4])
 
         self.fc1 = nn.Linear(196, 1)
         self.fc10 = nn.Linear(196, 10)
@@ -325,7 +324,7 @@ class ComplexModel(nn.Module):
         x = self.ln5(self.lrelu5(self.conv5(x)))
         x = self.ln6(self.lrelu6(self.conv6(x)))
         x = self.ln7(self.lrelu7(self.conv7(x)))
-        x = (self.lrelu8(self.conv8(x)))
+        x = ((self.conv8(x)))
         x = x.view(x.size(0), -1)
         return x
 
