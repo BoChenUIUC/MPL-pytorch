@@ -358,8 +358,7 @@ def disturb_main():
     sim_train = Simulator(train=True)
     sim_test = Simulator(train=False)
     PATH = 'backup/sf.pth'
-    # net = TwoLayer()
-    net = ComplexModel()
+    net = TwoLayer()
     if sim_train.opt.device != 'cpu':
         net = net.cuda()
     # net.load_state_dict(torch.load(PATH,map_location='cpu'))
