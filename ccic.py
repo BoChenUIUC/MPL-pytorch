@@ -578,12 +578,18 @@ def dual_train(net):
 		cgen.optimize(None,True)
 		torch.save(net.state_dict(), PATH)
 
+def test():
+	from app import disturb_main
+	disturb_main()
+
 if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
 
+	test()
+
 	# samples for eval
-	generate_image_samples('Tiled')
+	# generate_image_samples('Tiled')
 
 	# speed test
 	# for name in ['Tiled']:

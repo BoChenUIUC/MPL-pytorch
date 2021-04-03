@@ -7,7 +7,6 @@ import time
 
 import numpy as np
 import torch
-from torch.cuda import amp
 from torch import nn
 from torch.nn import functional as F
 from torch import optim
@@ -86,9 +85,7 @@ def set_seed(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
-
-
-
+ 
 def evaluate(args, test_loader, model, criterion):
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -105,9 +102,8 @@ def evaluate(args, test_loader, model, criterion):
             if args.device != 'cpu':
                 images = images.cuda()
                 targets = targets.cuda()
-            with amp.autocast(enabled=args.amp):
-                outputs = model(images)
-                loss = criterion(outputs, targets)
+            outputs = model(images)
+            loss = criterion(outputs, targets)
 
             acc1, acc5 = accuracy(outputs, targets, (1, 5))
             losses.update(loss.item(), batch_size)
@@ -200,8 +196,7 @@ def run_model(args, test_loader, model, datarange=None,TF=None,C_param=None):
             if args.device != 'cpu':
                 images = images.cuda()
                 targets = targets.cuda()
-            with amp.autocast(enabled=args.amp):
-                outputs = model(images)
+            outputs = model(images)
 
             acc1, acc5 = accuracy(outputs, targets, (1, 5))
             top1.update(acc1[0], batch_size)
@@ -247,8 +242,7 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
             if args.device != 'cpu':
                 images = images.cuda()
                 targets = targets.cuda()
-            with amp.autocast(enabled=args.amp):
-                outputs = model(images)
+            outputs = model(images)
 
             acc1, acc5 = accuracy(outputs, targets, (1, 5))
             top1.update(acc1[0], batch_size)
@@ -265,6 +259,171 @@ def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=
 
         test_iter.close()
         return acc,cr
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from torch.autograd import Variable
+
+def plot(samples):
+    fig = plt.figure(figsize=(8, 8))
+    gs = gridspec.GridSpec(8, 8)
+    gs.update(wspace=0.02, hspace=0.02)
+
+    for i, sample in enumerate(samples):
+        ax = plt.subplot(gs[i])
+        plt.axis('off')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_aspect('equal')
+        plt.imshow(sample)
+    return fig
+
+class TwoLayer(nn.Module):
+    def __init__(self):
+        super(TwoLayer, self).__init__()
+        num_features = 128
+        self.conv1 = nn.Conv2d(3, num_features, kernel_size=3, stride=1, padding=1)
+        self.bn1 = nn.BatchNorm2d(num_features)
+        self.conv2 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(num_features)
+        self.conv3 = nn.Conv2d(num_features, 1, kernel_size=3, stride=1, padding=1)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(((self.conv3(x))))
+        x = x.view(x.size(0), -1)
+        # x = F.tanh(x)
+        # x = x * 0.5 + 0.5
+        return x
+
+def disturb_main():
+    sim_train = Simulator(train=True)
+    sim_test = Simulator(train=False)
+    PATH = 'backup/sf.pth'
+    net = TwoLayer()
+    if sim_train.opt.device != 'cpu':
+        net = net.cuda()
+    # net.load_state_dict(torch.load(PATH,map_location='cpu'))
+    # net.eval()
+    # for i in range(10):
+    #     s = time.perf_counter()
+    #     print(net(torch.randn(1, 3, 32, 32)).shape)
+    #     print(time.perf_counter()-s)
+    # return 
+    for epoch in range(50):
+        disturb_train(sim_train.opt, sim_train.dataloader, sim_train.model, net)
+        disturb_test(sim_test.opt, sim_test.dataloader, sim_test.model, net)
+        torch.save(net.state_dict(), PATH)
+
+def disturb_train(args, train_loader, model, cnn_filter, datarange=None):
+    model.eval()
+    cnn_filter.train()
+    running_loss = AverageMeter()
+    entropy = nn.CrossEntropyLoss()
+    criterion = nn.MSELoss()
+    optimizer = optim.SGD(cnn_filter.parameters(), lr=0.001, momentum=0.9)
+    toMacroBlock = nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
+    train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
+    for step, (images, targets) in enumerate(train_iter):
+        if datarange is not None:
+            if step<datarange[0]:continue
+            elif step>=datarange[1]:break 
+        normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+        images = normalization(images)
+        # end transformation
+        batch_size = targets.shape[0]
+        if args.device != 'cpu':
+            images = images.cuda()
+            targets = targets.cuda()
+
+        # magics
+        X = Variable(images,requires_grad=True)
+        # raw = ((X+1)/2.).data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
+        # fig = plot(raw)
+        # plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
+        # plt.close(fig)
+        outputs = model(X)
+        loss = entropy(outputs, targets)
+        # loss = -outputs
+        gradients = torch.autograd.grad(outputs=loss, inputs=X,
+                                grad_outputs=torch.ones(loss.size()),
+                              create_graph=True, retain_graph=False, only_inputs=True)[0]
+
+        impact = torch.norm(gradients.data, dim=1)
+        impact = toMacroBlock(impact)
+        impact = impact.view(impact.size(0),-1)
+        impact /= torch.max(impact, dim=1, keepdim=True)[0]
+        # samples = impact.view(impact.size(0),4,4).data.cpu().numpy()
+        # fig = plot(samples)
+        # plt.savefig(f'samples/max_class_{step:1}.png', bbox_inches='tight')
+        # plt.close(fig)
+
+        # zero gradient
+        optimizer.zero_grad()
+
+        # forward + backward + optimize
+        pred = cnn_filter(images)
+        loss = criterion(pred, impact)
+        loss.backward()
+        optimizer.step()
+
+        running_loss.update(loss.cpu().item())
+
+        train_iter.set_description(
+            f"Train Iter: {step+1:3}. Loss: {loss.cpu().item():.3f} "
+            f"Avg Loss: {running_loss.avg:.3f}. ")
+
+    train_iter.close()
+
+def disturb_test(args, train_loader, model, cnn_filter, datarange=None):
+    model.eval()
+    cnn_filter.eval()
+    running_loss = AverageMeter()
+    entropy = nn.CrossEntropyLoss()
+    criterion = nn.MSELoss()
+    toMacroBlock = nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
+    test_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
+    for step, (images, targets) in enumerate(test_iter):
+        if datarange is not None:
+            if step<datarange[0]:continue
+            elif step>=datarange[1]:break 
+        normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+        images = normalization(images)
+        # end transformation
+        batch_size = targets.shape[0]
+        if args.device != 'cpu':
+            images = images.cuda()
+            targets = targets.cuda()
+
+        # magics
+        X = Variable(images,requires_grad=True) 
+        outputs = model(X)
+        loss = entropy(outputs, targets)
+        gradients = torch.autograd.grad(outputs=loss, inputs=X,
+                                grad_outputs=torch.ones(loss.size()),
+                              create_graph=True, retain_graph=False, only_inputs=True)[0]
+
+        impact = torch.norm(gradients.data, dim=1)
+        impact = toMacroBlock(impact)
+        impact = impact.view(impact.size(0),-1)
+        impact /= torch.max(impact, dim=1, keepdim=True)[0] 
+
+        # forward + backward + optimize
+        with torch.no_grad():
+            pred = cnn_filter(images)
+            loss = criterion(pred, impact)
+
+        running_loss.update(loss.cpu().item())
+
+        test_iter.set_description(
+            f"Test Iter: {step+1:3}. Loss: {loss.cpu().item():.3f} "
+            f"Avg Loss: {running_loss.avg:.3f}. ")
+
+    test_iter.close()
 
 class Simulator:
     def __init__(self,train=True):
