@@ -280,6 +280,55 @@ def plot(samples):
         plt.imshow(sample)
     return fig
 
+class ComplexModel(nn.Module):
+    def __init__(self):
+        super(ComplexModel, self).__init__()
+        self.conv1 = nn.Conv2d(3, 196, kernel_size=3, stride=1, padding=1)
+        self.ln1 = nn.LayerNorm([196,32,32])
+        self.lrelu1 = nn.LeakyReLU()
+
+        self.conv2 = nn.Conv2d(196, 196, kernel_size=3, stride=2, padding=1)
+        self.ln2 = nn.LayerNorm([196,16,16])
+        self.lrelu2 = nn.LeakyReLU()
+
+        self.conv3 = nn.Conv2d(196, 196, kernel_size=3, stride=1, padding=1)
+        self.ln3 = nn.LayerNorm([196,16,16])
+        self.lrelu3 = nn.LeakyReLU()
+
+        self.conv4 = nn.Conv2d(196, 196, kernel_size=3, stride=2, padding=1)
+        self.ln4 = nn.LayerNorm([196,8,8])
+        self.lrelu4 = nn.LeakyReLU()
+
+        self.conv5 = nn.Conv2d(196, 196, kernel_size=3, stride=1, padding=1)
+        self.ln5 = nn.LayerNorm([196,8,8])
+        self.lrelu5 = nn.LeakyReLU()
+
+        self.conv6 = nn.Conv2d(196, 196, kernel_size=3, stride=1, padding=1)
+        self.ln6 = nn.LayerNorm([196,8,8])
+        self.lrelu6 = nn.LeakyReLU()
+
+        self.conv7 = nn.Conv2d(196, 196, kernel_size=3, stride=1, padding=1)
+        self.ln7 = nn.LayerNorm([196,8,8])
+        self.lrelu7 = nn.LeakyReLU()
+
+        self.conv8 = nn.Conv2d(196, 1, kernel_size=3, stride=2, padding=1)
+        self.ln8 = nn.LayerNorm([1,4,4])
+
+        self.fc1 = nn.Linear(196, 1)
+        self.fc10 = nn.Linear(196, 10)
+
+    def forward(self, x):
+        x = self.ln1(self.lrelu1(self.conv1(x)))
+        x = self.ln2(self.lrelu2(self.conv2(x)))
+        x = self.ln3(self.lrelu3(self.conv3(x)))
+        x = self.ln4(self.lrelu4(self.conv4(x)))
+        x = self.ln5(self.lrelu5(self.conv5(x)))
+        x = self.ln6(self.lrelu6(self.conv6(x)))
+        x = self.ln7(self.lrelu7(self.conv7(x)))
+        x = (self.lrelu8(self.conv8(x)))
+        x = x.view(x.size(0), -1)
+        return x
+
 class TwoLayer(nn.Module):
     def __init__(self):
         super(TwoLayer, self).__init__()
@@ -302,8 +351,8 @@ class TwoLayer(nn.Module):
         x = (F.relu(self.bn4(self.conv4(x))))
         x = self.pool(((self.conv5(x))))
         x = x.view(x.size(0), -1)
-        # x = F.tanh(x)
-        # x = x * 0.5 + 0.5
+        x = F.tanh(x)
+        x = x * 0.5 + 0.5
         return x
 
 def disturb_main():
