@@ -389,7 +389,7 @@ def tile_scaler(image, C_param):
 	 
 	# not used for training,but can be used for 
 	# ploting the pareto front
-	dsize = (int(img_w*C_param),int(C_param*img_h))
+	dsize = (max(1,int(img_w*C_param)),max(1,int(C_param*img_h)))
 	original_size = len(pickle.dumps(bgr_frame, 0))
 	compressed = cv2.resize(bgr_frame, dsize=dsize, interpolation=cv2.INTER_LINEAR)
 	compressed_size = len(pickle.dumps(compressed, 0))
