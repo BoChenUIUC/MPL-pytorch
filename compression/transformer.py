@@ -3,7 +3,8 @@ import numpy as np
 import time
 import torch
 import glob
-
+from torch import nn
+from torch.nn import functional as F
 from torchvision import transforms
 from torch.utils.data import Dataset
 from collections import OrderedDict
@@ -380,7 +381,35 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 		cv2.imwrite(f'samples/{counter:2}_compressed.jpg',bgr_frame)
 	return bgr_frame,original_size,compressed_size,end-start
 
-def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
+def tile_scaler(image, C_param):
+	start = time.perf_counter() 
+	# analyze features in image
+	bgr_frame = np.array(image) 
+	img_h,img_w = bgr_frame.shape[:2]
+	 
+	# not used for training,but can be used for 
+	# ploting the pareto front
+	dsize = (int(img_w*C_param),int(C_param*img_h))
+	original_size = len(pickle.dumps(bgr_frame, 0))
+	compressed = cv2.resize(bgr_frame, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+	compressed_size = len(pickle.dumps(compressed, 0))
+	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
+
+	end = time.perf_counter()
+	return decompressed,original_size,compressed_size,end-start
+
+
+def quality2image(image, quality, jpeg):
+	bgr_frame = np.array(image)
+	bgr_frame = np.ascontiguousarray(bgr_frame)
+	original_size = len(pickle.dumps(bgr_frame, 0))
+	feature_encoding = np.clip(np.rint(quality*100),1,100).astype(np.uint8)
+	jpegraw = jpeg.encode(bgr_frame,feature_encoding)
+	compressed_size = len(jpegraw)
+	bgr_frame = jpeg.decode(jpegraw,feature_encoding)
+	return bgr_frame,original_size,compressed_size
+
+def tile_encoder(image, C_param, jpeg, counter, snapshot=False, rand=False):
 	start = time.perf_counter()
 	toSave = snapshot and counter<16
 	# analyze features in image
@@ -432,16 +461,110 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	lower,upper = min(lower,upper),max(lower,upper)
 	lower = max(lower,0);upper = min(upper,1)
 	# order to adjust the concentration of the  scores
-	k = int(((C_param[num_features+2]+0.5)*5))
-	k = min(k,4); k = max(k,0)
-	order_choices = [1./3,1./2,1,2,3]
+	k = C_param[num_features+2]
+	order = 2*k if k>=0 else 1/2*k
 	# score of each feature sum to 1
 	normalized_score = counts/(np.sum(counts,axis=0)+1e-6)
 	weights /= (np.sum(weights)+1e-6)
 	# ws of all tiles sum up to 1
 	weighted_scores = np.matmul(normalized_score,weights)
 	# the weight is more valuable when its value is higher
-	quality = (upper-lower)*weighted_scores**order_choices[k] + lower
+	quality = (upper-lower)*weighted_scores**order + lower
+	# generate heatmap
+	if toSave:
+		hm = np.reshape(quality,(heightInBlock,widthInBlock))
+		hm = np.repeat(hm,2,axis=1)
+		# plt.imshow(hm, cmap='hot', interpolation='nearest')
+		# plt.savefig(f'samples/{counter:2}_heatmap.jpg')
+		fig, ax = plt.subplots()
+
+		im, cbar = heatmap(hm, [str(i) for i in range(heightInBlock)],
+						 [str(i) for i in range(widthInBlock)], ax=ax,
+		                   cmap="coolwarm")
+		# texts = annotate_heatmap(im, valfmt="{x:.2f}")
+
+		fig.tight_layout()
+		plt.savefig(f'samples/{counter:02}_heatmap.jpg')
+
+	original_size = len(pickle.dumps(bgr_frame, 0))
+	feature_encoding = np.clip(np.rint(quality*100),1,100).astype(np.uint8)
+	if rand == True:
+		feature_encoding = np.random.permutation(feature_encoding)
+	# feature_encoding = np.ones(widthInBlock*heightInBlock,dtype=np.uint8)*85
+	jpegraw = jpeg.encode(bgr_frame,feature_encoding)
+	compressed_size = len(jpegraw)
+	end = time.perf_counter()
+	bgr_frame = jpeg.decode(jpegraw,feature_encoding)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:02}_compressed.jpg',bgr_frame)
+	return bgr_frame,original_size,compressed_size,end-start
+
+def ROI_encoder(image, C_param, jpeg, counter, snapshot=False):
+	start = time.perf_counter()
+	toSave = snapshot and counter<16
+	# analyze features in image
+	bgr_frame = np.array(image)
+	bgr_frame = np.ascontiguousarray(bgr_frame)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:02}_origin.jpg',bgr_frame)
+	# harris corner
+	# hc, _ = get_harris_corner(bgr_frame)
+	# FAST
+	fast = get_FAST(bgr_frame)
+	# STAR
+	star = get_STAR(bgr_frame)
+	# star = get_SIFT(bgr_frame)
+	# ORB
+	orb = get_ORB(bgr_frame)
+	# orb = get_GFTT(bgr_frame)
+	# print(len(fast),len(star),len(orb))
+
+	point_features = [fast, star, orb]
+	num_features = len(point_features)
+	# snapshot features optionally
+	if toSave:
+		feature_frame = np.zeros(bgr_frame.shape)
+		colors = [(72, 31, 219),(89, 152, 26),(255, 150, 54)]
+		for points,color in zip(point_features,colors):
+			for px,py in points:
+				feature_frame = cv2.circle(feature_frame, (int(px),int(py)), radius=2, color=color, thickness=-1)
+		cv2.imwrite(f'samples/{counter:02}_feature.jpg',feature_frame)
+	
+	# divide image to 4*3 tiles
+	img_h,img_w = bgr_frame.shape[:2]
+	block_w,block_h = 16,8
+	# compute block height/width
+	heightInBlock = int(img_h/block_h) if img_h%block_h==0 else (int(img_h/block_h) + 1)
+	widthInBlock = int(img_w/block_w) if img_w%block_w==0 else (int(img_w/block_w) + 1)
+	# count features in each block
+	start_cnt = time.perf_counter()
+	gridx = [i for i in range(0,img_w,block_w)] + [img_w]
+	gridy = [i for i in range(0,img_h,block_h)] + [img_h]
+	counts = np.zeros((widthInBlock*heightInBlock,num_features))
+	for feat_idx, features in enumerate(point_features):
+		feature_x = [p[0] for p in features]
+		feature_y = [p[1] for p in features]
+		grid, _, _ = np.histogram2d(feature_x, feature_y, bins=[gridx, gridy])
+		counts[:,feat_idx] = np.reshape(grid.T,(widthInBlock*heightInBlock))
+
+	# weight of different features
+	weights = C_param[:num_features] + 0.5
+	# lower and upper
+	lower,upper = C_param[num_features:num_features+2] + 0.5
+	lower,upper = min(lower,upper),max(lower,upper)
+	lower = max(lower,0);upper = min(upper,1)
+	k = int((C_param[num_features+2]+0.5)*8)
+	k = max(k,0); k = min(k,7)
+	# score of each feature sum to 1
+	normalized_score = counts/(np.sum(counts,axis=0)+1e-6)
+	weights /= (np.sum(weights)+1e-6)
+	# ws of all tiles sum up to 1
+	weighted_scores = np.matmul(normalized_score,weights)
+	# could assign top K tiles to high
+	# the weight is more valuable when its value is higher
+	quality = np.ones(weighted_scores.shape)*lower
+	idx = np.argpartition(weighted_scores, -k)[-k:]
+	quality[idx] = upper
 	# generate heatmap
 	if toSave:
 		hm = np.reshape(quality,(heightInBlock,widthInBlock))
@@ -465,6 +588,75 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	compressed_size = len(jpegraw)
 	end = time.perf_counter()
 	bgr_frame = jpeg.decode(jpegraw,feature_encoding)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:02}_compressed.jpg',bgr_frame)
+	return bgr_frame,original_size,compressed_size,end-start
+
+def CNN_encoder(image, C_param, jpeg, model, counter, snapshot=False, rand=False):
+	start = time.perf_counter()
+	# analyze features in image
+	toSave = snapshot and counter<10
+	# analyze features in image
+	bgr_frame = np.array(image)
+	bgr_frame = np.ascontiguousarray(bgr_frame)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:02}_origin.jpg',bgr_frame)
+	th_img = torch.from_numpy(image[:,:,(2,1,0)]).permute(2,0,1).unsqueeze(0)
+	
+	assert(len(C_param)==3)
+	# lower and upper
+	lower,upper = C_param[0:2] + 0.5
+	lower,upper = min(lower,upper),max(lower,upper)
+	lower = max(lower,0);upper = min(upper,1)
+	# shape
+	k = C_param[2]
+	order = 2*k if k>=0 else -1/2*k
+
+	# divide image to tiles
+	img_h,img_w = bgr_frame.shape[:2]
+	block_w,block_h = 16,8
+	tile_w,tile_h = 16,8
+	# compute block height/width
+	heightInBlock = int(img_h/block_h) if img_h%block_h==0 else (int(img_h/block_h) + 1)
+	widthInBlock = int(img_w/block_w) if img_w%block_w==0 else (int(img_w/block_w) + 1)
+	heightInTile = int(img_h/tile_h) if img_h%tile_h==0 else (int(img_h/tile_h) + 1)
+	widthInTile = int(img_w/tile_w) if img_w%tile_w==0 else (int(img_w/tile_w) + 1)
+
+	# CNN features
+	with torch.no_grad():
+		img = th_img.float() / 255.0  
+		cnn_feat = model(img,flag=True)
+		pool = nn.AvgPool2d(kernel_size=(1,2), stride=(1,2), padding=0, ceil_mode=True)
+		cnn_feat = pool(cnn_feat)
+		assert(heightInTile == cnn_feat.size(2) and widthInTile == cnn_feat.size(3))
+		cnn_feat = cnn_feat.view(cnn_feat.size(0), -1).numpy()
+	quality = (upper-lower)*cnn_feat[0]**order + lower
+
+	# generate heatmap
+	if toSave:
+		hm = np.reshape(quality,(heightInBlock,widthInBlock))
+		hm = np.repeat(hm,2,axis=1)
+		# plt.imshow(hm, cmap='hot', interpolation='nearest')
+		# plt.savefig(f'samples/{counter:2}_heatmap.jpg')
+		fig, ax = plt.subplots()
+
+		im, cbar = heatmap(hm, [str(i) for i in range(heightInBlock)],
+						 [str(i) for i in range(widthInBlock)], 
+						 ax=ax, cmap="coolwarm")
+		# texts = annotate_heatmap(im, valfmt="{x:.2f}")
+
+		fig.tight_layout()
+		plt.savefig(f'samples/{counter:02}_heatmap.jpg')
+
+	original_size = len(pickle.dumps(bgr_frame, 0))
+	feature_encoding = np.clip(np.rint(quality*100),1,100).astype(np.uint8)
+	# if rand == True:
+	# 	feature_encoding = np.random.permutation(feature_encoding)
+	# feature_encoding = np.ones(widthInBlock*heightInBlock,dtype=np.uint8)*45
+	jpegraw = jpeg.encode(bgr_frame,feature_encoding)
+	compressed_size = len(jpegraw)
+	end = time.perf_counter()
+	bgr_frame = jpeg.decode(jpegraw,feature_encoding) 
 	if toSave:
 		cv2.imwrite(f'samples/{counter:02}_compressed.jpg',bgr_frame)
 	return bgr_frame,original_size,compressed_size,end-start
@@ -525,6 +717,40 @@ def WebP(npimg,C_param):
 	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
 	return lossy_image,osize,csize,end-start
 
+class TwoLayer(nn.Module):
+    def __init__(self):
+        super(TwoLayer, self).__init__()
+        num_features = 128
+        self.conv1 = nn.Conv2d(3, num_features, kernel_size=3, stride=1, padding=1)
+        self.bn1 = nn.BatchNorm2d(num_features)
+        self.conv2 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(num_features)
+        self.conv3 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm2d(num_features)
+        self.conv4 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
+        self.bn4 = nn.BatchNorm2d(num_features)
+        self.conv5 = nn.Conv2d(num_features, 1, kernel_size=3, stride=1, padding=1)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+
+    def forward(self, x, flag=False):
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = (F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(F.relu(self.bn3(self.conv3(x))))
+        x = (F.relu(self.bn4(self.conv4(x))))
+        x = self.pool(((self.conv5(x))))
+        if flag == False:
+        	x = x.view(x.size(0), -1)
+        x = F.tanh(x)
+        x = x * 0.5 + 0.5
+        return x
+
+def load_CNN():
+	PATH = 'backup/sf.pth'
+	net = TwoLayer()
+	net.load_state_dict(torch.load(PATH,map_location='cpu'))
+	net.eval()
+	return net
+
 # define a class for transformation
 class Transformer:
 	def __init__(self,name,snapshot = False):
@@ -533,12 +759,15 @@ class Transformer:
 		self.snapshot = snapshot
 		self.counter = 0
 		self.time = []
+		if self.name in ['JPEG','Tiled','CNN','CNNRand','Quality','ROI']:
+			self.jpeg = TurboJPEG()
+		if self.name in['CNN','CNNRand']:
+			self.CNN = load_CNN()
 
 	def transform(self, image=None, C_param=None):
 		# need to recover images and print examples
 		# get JPEG lib
 		if self.name == 'JPEG':
-			self.jpeg = TurboJPEG()
 			# 0->100
 			rimage,osize,csize,t = TUBBOJPEG(image,C_param,self.jpeg)
 			# rimage,osize,csize,t = JPEG(image,C_param)
@@ -550,8 +779,18 @@ class Transformer:
 		elif self.name == 'TiledLegacy':
 			rimage,osize,csize,t = tile_legacy(image, C_param, self.counter, self.snapshot)
 		elif self.name == 'Tiled':	
-			self.jpeg = TurboJPEG()
 			rimage,osize,csize,t = tile_encoder(image, C_param, self.jpeg, self.counter, self.snapshot)
+		elif self.name == 'CNNRand':	
+			rimage,osize,csize,t = CNN_encoder(image, C_param, self.jpeg, self.CNN, self.counter, self.snapshot,True)
+		elif self.name == 'CNN':
+			rimage,osize,csize,t = CNN_encoder(image, C_param, self.jpeg, self.CNN, self.counter, self.snapshot)
+		elif self.name == 'Quality':
+			rimage,osize,csize = quality2image(image, C_param, self.jpeg)
+			t = 0
+		elif self.name == 'ROI':
+			rimage,osize,csize,t = ROI_encoder(image, C_param, self.jpeg, self.counter, self.snapshot)
+		elif self.name == 'Scale':
+			rimage,osize,csize,t = tile_scaler(image, C_param)
 		else:
 			print(self.name,'not implemented.')
 			exit(1)

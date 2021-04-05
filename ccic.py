@@ -293,7 +293,7 @@ def pareto_front_approx_nsga2(comp_name):
 	print(comp_name,'NSGA II')
 	class MyProblem(Problem):
 		def __init__(self):
-			super().__init__(n_var=6, n_obj=2, n_constr=0, xl=np.array([-.5]*6), xu=np.array([.5]*6))
+			super().__init__(n_var=3, n_obj=2, n_constr=0, xl=np.array([-.5]*6), xu=np.array([.5]*6))
 			self.sim = Simulator(train=True)
 			self.TF = Transformer(comp_name)
 			self.datarange = [0,100]
@@ -310,7 +310,7 @@ def pareto_front_approx_nsga2(comp_name):
 				self.cfg_file.write(' '.join([str(n) for n in x[row,:]])+'\n')
 				self.acc_file.write(str(float(acc))+'\n')
 				self.cr_file.write(str(cr)+'\n')
-				print('Iter:',self.iter)
+				print('Iter:',self.iter,float(acc),cr)
 				self.iter += 1
 			out["F"] = np.array(points)
 	start = time.perf_counter()
@@ -331,6 +331,7 @@ def pareto_front_approx_nsga2(comp_name):
 
 # PFA using MOBO
 def pareto_front_approx_mobo(comp_name,max_iter=1000):
+	from app import disturb_main
 	start = time.perf_counter()
 	d = {}
 	d['cfg_file'] = open(comp_name+'_'+'MOBO_cfg.log', "w", 1)
@@ -338,19 +339,20 @@ def pareto_front_approx_mobo(comp_name,max_iter=1000):
 	d['cr_file'] = open(comp_name+'_'+'MOBO_cr.log', "w", 1)
 	d['iter'] = 0
 	def objective(x):
-		sim = Simulator(train=True)
-		TF = Transformer(comp_name)
+		# sim = Simulator(train=True)
+		# TF = Transformer(comp_name)
 		datarange = [0,100]
-		print('Iter:',d['iter'],x)
-		acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
+		# acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
+		acc,cr = disturb_main(x,datarange)
 		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
-		d['acc_file'].write(str(float(acc))+'\n')
+		d['acc_file'].write(str(acc)+'\n')
 		d['cr_file'].write(str(cr)+'\n')
 		d['iter'] += 1
+		print('Iter:',d['iter'],x,acc,cr)
 		return np.array([float(acc),cr])
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
-		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
+		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=50)
 	front, pop = Optimizer.maximize(n_iter=max_iter)
 	end = time.perf_counter()
@@ -417,7 +419,7 @@ def evaluation(EXP_NAME):
 		acc,cr = sim.get_one_point(datarange, TF=None, C_param=None)
 		eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 	else:
-		for i in range(101):
+		for i in range(50,101):
 			print(EXP_NAME,i)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
 			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
@@ -489,24 +491,15 @@ def test_run():
 		acc_file.write(' '.join([str(n) for n in map50s])+'\n')
 		cr_file.write(' '.join([str(n) for n in crs])+'\n')
 
-def generate_image_samples(EXP_NAME):
+def generate_image_samples():
+	EXP_NAME = 'ROI'
 	sim = Simulator(train=True)
 	TF = Transformer(name=EXP_NAME,snapshot=True)
 	datarange = [0,1]#sim.num_batches]
-	selected_lines = [92,152]
-	# replace pf file later
-	with open(EXP_NAME+'_MOBO_pf.log','r') as f:
-		for lcnt,line in enumerate(f.readlines()):
-			if lcnt not in selected_lines:
-				continue
-			tmp = line.strip().split(' ')
-			acc,cr = float(tmp[0]),float(tmp[1])
-			C_param = np.array([float(n) for n in tmp[2:]])
-			acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
-			print(acc1,cr1,C_param)
-			break
-	m,s = TF.get_compression_time()
-	print(m,s)
+	
+	C_param = np.array([0,0,0,-0.1,0,-.1])
+	acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
+	print(float(acc1),cr1,C_param)
 
 def dual_train(net):
 	np.random.seed(123)
@@ -580,16 +573,16 @@ def dual_train(net):
 
 def test():
 	from app import disturb_main
-	disturb_main()
+	disturb_main(np.array([-0.1,0,-0.3]),[0,10])
 
 if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
 
-	test()
+	# test()
 
 	# samples for eval
-	# generate_image_samples('Tiled')
+	# generate_image_samples()
 
 	# speed test
 	# for name in ['Tiled']:
@@ -605,19 +598,19 @@ if __name__ == "__main__":
 	# pareto_front_approx_nsga2('Tiled')
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
-	# change iters to 500
-	# for comp_name in['Tiled']:
+	# change iters to 500,TiledRand
+	# for comp_name in['Model']:
 	# 	pareto_front_approx_mobo(comp_name,450)
 
 	# compute eval metrics
 	# comparePF(500)
 
 	# convert from .log file to pf for eval
-	# configs2paretofront('Tiled_MOBO',500)
+	configs2paretofront('ROI_MOBO',500)
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	# for name in ['Tiled']:
+	# for name in ['JPEG']:
 	# 	evaluation(name)
 
 	# caculate metrics

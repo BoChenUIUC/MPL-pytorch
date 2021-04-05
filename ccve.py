@@ -188,14 +188,16 @@ class ParetoFront:
 	def cov(self,other):
 		covered = 0.0
 		for dp1 in other.data:
-			# if dp1 in [(0,1),(1,0)]:continue
+			if dp1 in [(0,1),(1,0)]:continue
 			dominated = False
 			for dp2 in self.data:
 				# if dp2 in [(0,1),(1,0)]:continue
-				if dp2[0]>dp1[0] and dp2[1]>dp1[1]:
+				if (dp2[0]>dp1[0] and dp2[1]>=dp1[1]) or (dp2[0]>=dp1[0] and dp2[1]>dp1[1]):
 					dominated = True
 					break
 			if dominated:covered += 1
+			# else:
+			# 	print(dp1)
 		return covered/(len(other.data)-2)
 
 	def uniformity(self):
@@ -331,7 +333,6 @@ def pareto_front_approx_nsga2(comp_name):
 
 # PFA using MOBO
 def pareto_front_approx_mobo(comp_name,max_iter=1000):
-	start = time.perf_counter()
 	d = {}
 	d['cfg_file'] = open(comp_name+'_'+'MOBO_cfg.log', "w", 1)
 	d['acc_file'] = open(comp_name+'_'+'MOBO_acc.log', "w", 1)
@@ -353,9 +354,6 @@ def pareto_front_approx_mobo(comp_name,max_iter=1000):
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=50)
 	front, pop = Optimizer.maximize(n_iter=max_iter)
-	end = time.perf_counter()
-	with open('MOBO_time.log','w',1) as f:
-		f.write(str(end-start)+'s')
 
 # PFA
 def pareto_front_approx(comp_name,EXP_NAME):
@@ -405,7 +403,7 @@ def evaluation(EXP_NAME):
 	datarange = [0,sim.num_batches]
 	eval_file = open(EXP_NAME+'_eval.log', "w", 1)
 
-	if EXP_NAME in ['Tiled', 'TiledLegacy']:
+	if EXP_NAME in ['Tiled', 'TiledLegacy','ROI']:
 		with open(EXP_NAME+'_MOBO_pf.log','r') as f:
 			for line in f.readlines()[::-1]:
 				tmp = line.strip().split(' ')
@@ -416,6 +414,11 @@ def evaluation(EXP_NAME):
 	elif EXP_NAME == 'RAW':
 		acc,cr = sim.get_one_point(datarange, TF=None, C_param=None)
 		eval_file.write(f"{acc:.3f} {cr:.3f}\n")
+	elif EXP_NAME == 'Scale':
+		for i in range(1,101):
+			print(EXP_NAME,i)
+			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i/100.0)
+			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 	else:
 		for i in range(101):
 			print(EXP_NAME,i)
@@ -583,7 +586,7 @@ if __name__ == "__main__":
 	torch.manual_seed(2)
 
 	# samples for eval
-	generate_image_samples('Tiled')
+	# generate_image_samples('ROI')
 
 	# speed test
 	# for name in ['Tiled']:
@@ -600,7 +603,7 @@ if __name__ == "__main__":
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
-	# for comp_name in['Tiled']:
+	# for comp_name in['ROI']:
 	# 	pareto_front_approx_mobo(comp_name,450)
 
 	# compute eval metrics
@@ -611,8 +614,8 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	# for name in ['Tiled']:
-	# 	evaluation(name)
+	for name in ['Scale']:
+		evaluation(name)
 
 	# caculate metrics
 	# eval_metrics()

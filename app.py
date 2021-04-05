@@ -280,54 +280,6 @@ def plot(samples):
         plt.imshow(sample)
     return fig
 
-class ComplexModel(nn.Module):
-    def __init__(self):
-        super(ComplexModel, self).__init__()
-        self.conv1 = nn.Conv2d(3, 196, kernel_size=3, stride=1, padding=1)
-        self.ln1 = nn.LayerNorm([196,32,32])
-        self.lrelu1 = nn.LeakyReLU()
-
-        self.conv2 = nn.Conv2d(196, 196, kernel_size=3, stride=2, padding=1)
-        self.ln2 = nn.LayerNorm([196,16,16])
-        self.lrelu2 = nn.LeakyReLU()
-
-        self.conv3 = nn.Conv2d(196, 196, kernel_size=3, stride=1, padding=1)
-        self.ln3 = nn.LayerNorm([196,16,16])
-        self.lrelu3 = nn.LeakyReLU()
-
-        self.conv4 = nn.Conv2d(196, 196, kernel_size=3, stride=2, padding=1)
-        self.ln4 = nn.LayerNorm([196,8,8])
-        self.lrelu4 = nn.LeakyReLU()
-
-        self.conv5 = nn.Conv2d(196, 196, kernel_size=3, stride=1, padding=1)
-        self.ln5 = nn.LayerNorm([196,8,8])
-        self.lrelu5 = nn.LeakyReLU()
-
-        self.conv6 = nn.Conv2d(196, 196, kernel_size=3, stride=1, padding=1)
-        self.ln6 = nn.LayerNorm([196,8,8])
-        self.lrelu6 = nn.LeakyReLU()
-
-        self.conv7 = nn.Conv2d(196, 196, kernel_size=3, stride=1, padding=1)
-        self.ln7 = nn.LayerNorm([196,8,8])
-        self.lrelu7 = nn.LeakyReLU()
-
-        self.conv8 = nn.Conv2d(196, 1, kernel_size=3, stride=2, padding=1)
-
-        self.fc1 = nn.Linear(196, 1)
-        self.fc10 = nn.Linear(196, 10)
-
-    def forward(self, x):
-        x = self.ln1(self.lrelu1(self.conv1(x)))
-        x = self.ln2(self.lrelu2(self.conv2(x)))
-        x = self.ln3(self.lrelu3(self.conv3(x)))
-        x = self.ln4(self.lrelu4(self.conv4(x)))
-        x = self.ln5(self.lrelu5(self.conv5(x)))
-        x = self.ln6(self.lrelu6(self.conv6(x)))
-        x = self.ln7(self.lrelu7(self.conv7(x)))
-        x = ((self.conv8(x)))
-        x = x.view(x.size(0), -1)
-        return x
-
 class TwoLayer(nn.Module):
     def __init__(self):
         super(TwoLayer, self).__init__()
@@ -354,13 +306,14 @@ class TwoLayer(nn.Module):
         x = x * 0.5 + 0.5
         return x
 
-def disturb_main():
+def disturb_main(param,datarange):
     sim_train = Simulator(train=True)
-    sim_test = Simulator(train=False)
-    PATH = 'backup/sf.pth'
-    net = TwoLayer()
-    if sim_train.opt.device != 'cpu':
-        net = net.cuda()
+    return disturb_exp(sim_train.opt, sim_train.dataloader, sim_train.model, param, datarange)
+    # sim_test = Simulator(train=False)
+    # PATH = 'backup/sf.pth'
+    # net = TwoLayer()
+    # if sim_train.opt.device != 'cpu':
+    #     net = net.cuda()
     # net.load_state_dict(torch.load(PATH,map_location='cpu'))
     # net.eval()
 
@@ -369,10 +322,187 @@ def disturb_main():
     #     print(net(torch.randn(1, 3, 32, 32)).shape)
     #     print(time.perf_counter()-s)
     # return 
-    for epoch in range(50):
-        disturb_train(sim_train.opt, sim_train.dataloader, sim_train.model, net)
-        disturb_test(sim_test.opt, sim_test.dataloader, sim_test.model, net)
-        torch.save(net.state_dict(), PATH)
+    # for epoch in range(10):
+    #     disturb_train(sim_train.opt, sim_train.dataloader, sim_train.model, net)
+    #     disturb_test(sim_test.opt, sim_test.dataloader, sim_test.model, net)
+    #     torch.save(net.state_dict(), PATH)
+
+def check_accuracy(images,targets,model):
+    normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+    images = normalization(images)
+    batch_size = targets.shape[0]
+    outputs = model(images)
+    entropy = nn.CrossEntropyLoss()
+    loss = entropy(outputs, targets)
+    acc1,_ = accuracy(outputs, targets, (1,5))
+    return acc1,loss,torch.max(outputs,axis=1)[1]
+
+
+def disturb_exp(args, train_loader, model, param, datarange=None):
+    from compression.transformer import Transformer
+    # ROI_TF = Transformer(name='ROI')
+    Qual_TF = Transformer(name='Quality')
+    running_top1 = AverageMeter()
+    Qual_TF.reset()
+    model.eval()
+    entropy = nn.CrossEntropyLoss()
+    toMacroBlock = nn.AvgPool2d(kernel_size=(8,16), stride=(8,16), padding=0, ceil_mode=True)
+    train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
+    for step, (images, targets) in enumerate(train_iter):
+        if datarange is not None:
+            if step<datarange[0]:continue
+            elif step>=datarange[1]:break 
+        cache_images = images.clone()
+        normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+        images = normalization(images)
+        batch_size = targets.shape[0]
+        if args.device != 'cpu':
+            images = images.cuda()
+            targets = targets.cuda()
+
+        # magics
+        X = Variable(images,requires_grad=True) 
+        # raw = ((X+1)/2.).data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
+        # fig = plot(raw)
+        # plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
+        # plt.close(fig)
+        outputs = model(X)
+        loss = entropy(outputs, targets)
+        # loss = -outputs
+        gradients = torch.autograd.grad(outputs=loss, inputs=X,
+                                grad_outputs=torch.ones(loss.size()),
+                              create_graph=True, retain_graph=False, only_inputs=True)[0]
+        impact = torch.norm(gradients.data, dim=1)
+        impact = toMacroBlock(impact)
+        impact = impact.view(impact.size(0),-1)
+        # plot
+        # samples = impact.view(impact.size(0),4,2).data.cpu().numpy()
+        # fig = plot(samples)
+        # plt.savefig(f'samples/max_class_{step:1}.png', bbox_inches='tight')
+        # plt.close(fig)
+
+        # loss map
+        # C_params = torch.ones(impact.size())*0.4
+        # loss_map = torch.zeros(impact.size())
+        # for img_idx in range(64):
+        #     print(img_idx)
+        #     for pos in range(8):
+        #         C_params[img_idx][pos] = 0.5
+        #         Qual_TF.reset()
+        #         tf_imgs = None
+        #         for i,th_img in enumerate(cache_images):
+        #             np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+        #             tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy())
+        #             tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
+        #             if tf_imgs is None:
+        #                 tf_imgs = tf_img
+        #             else:
+        #                 tf_imgs = torch.cat((tf_imgs,tf_img),0)
+        #         acc1,loss,pred = check_accuracy(tf_imgs,targets,model)
+        #         cr = Qual_TF.get_compression_ratio()
+        #         loss_map[img_idx,pos] = loss.cpu().item()
+        #         C_params[img_idx][pos] = 0.4
+        # loss_map /= torch.max(loss_map, dim=1, keepdim=True)[0]
+        # samples = loss_map.view(loss_map.size(0),4,2).data.cpu().numpy()
+        # fig = plot(samples)
+        # plt.savefig(f'samples/loss_map_{step:1}.png', bbox_inches='tight')
+        # plt.close(fig)
+
+
+        # observ = torch.zeros((64,8))
+        # C_params = torch.ones(impact.size())*0.4
+        # for col in range(8):
+        #     C_params[:,col] = 0.5
+        #     Qual_TF.reset()
+        #     tf_imgs = None
+        #     for i,th_img in enumerate(cache_images):
+        #         np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+        #         tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy())
+        #         tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
+        #         if tf_imgs is None:
+        #             tf_imgs = tf_img
+        #         else:
+        #             tf_imgs = torch.cat((tf_imgs,tf_img),0)
+        #     images = tf_imgs
+        #     acc1,_,pred = check_accuracy(images,targets,model)
+        #     cr = Qual_TF.get_compression_ratio()
+        #     print('Metrics:',col,acc1,cr,targets.size())
+        #     observ[:,col] = pred
+        #     C_params[:,col] = 0.4
+        # gt = targets.view(64,1).repeat(1,8)
+        # maxval = torch.max(impact, dim=1, keepdim=True)[0]
+        # test = maxval == impact
+        # detect = observ == gt
+        # for row in range(observ.size(0)):
+        #     print(row,detect[row],impact[row])
+        # print(torch.max(detect,dim=1))
+
+        lower,upper,k = param+0.5
+        k = int(k*8)
+        k = max(k,0); k = min(k,7)
+        # impact driven
+        idx = torch.topk(impact,k,dim=1)[1]
+        C_params = torch.ones(impact.size())*lower
+        tf_imgs = None
+        for i,th_img in enumerate(cache_images):
+            np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+            C_params[i,idx[i]] = float(upper)
+            tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy())
+            tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
+            if tf_imgs is None:
+                tf_imgs = tf_img
+            else:
+                tf_imgs = torch.cat((tf_imgs,tf_img),0)
+        images = tf_imgs
+        acc1,_,_ = check_accuracy(images,targets,model)
+        cr = Qual_TF.get_compression_ratio()
+        # print('Impact:',acc1,cr,loss.cpu().item())
+        running_top1.update(float(acc1))
+        train_iter.set_description(
+            f"Train Iter: {step+1:3}. Top1: {running_top1.avg:.3f} "
+            f"Compression Rate: {cr:.3f}. ")
+
+        # feature driven
+        # C_param = np.array([0,0,0,-0.1,0,-.3])
+        # ROI_TF.reset()
+        # tf_imgs = None
+        # for i,th_img in enumerate(cache_images):
+        #     np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+        #     tf_img = ROI_TF.transform(image=np_img, C_param=C_param)
+        #     tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
+        #     if tf_imgs is None:
+        #         tf_imgs = tf_img
+        #     else:
+        #         tf_imgs = torch.cat((tf_imgs,tf_img),0)
+        # images = tf_imgs
+        # acc1,loss,_ = check_accuracy(images,targets,model)
+        # cr = ROI_TF.get_compression_ratio()
+        # print('Feature:',acc1,cr,loss.cpu().item())
+
+        # jpeg
+        # print('------------JPEG--------------')
+
+        # C_params = torch.ones(impact.size())
+        # for mul in range(1,11):
+        #     Qual_TF.reset()
+        #     tf_imgs = None
+        #     for i,th_img in enumerate(cache_images):
+        #         # print(i,C_params[i,:])
+        #         # print(impact[i,:])
+        #         np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+        #         tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy()*mul/10.0)
+        #         tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
+        #         if tf_imgs is None:
+        #             tf_imgs = tf_img
+        #         else:
+        #             tf_imgs = torch.cat((tf_imgs,tf_img),0)
+        #     images = tf_imgs
+        #     acc1,loss,_ = check_accuracy(images,targets,model)
+        #     cr = Qual_TF.get_compression_ratio()
+        #     print('Metrics:',mul,acc1,cr,loss.cpu().item())
+
+    train_iter.close()
+    return running_top1.avg,Qual_TF.get_compression_ratio()
 
 def disturb_train(args, train_loader, model, cnn_filter, datarange=None):
     model.eval()
@@ -411,7 +541,7 @@ def disturb_train(args, train_loader, model, cnn_filter, datarange=None):
         impact = torch.norm(gradients.data, dim=1)
         impact = toMacroBlock(impact)
         impact = impact.view(impact.size(0),-1)
-        impact /= torch.max(impact, dim=1, keepdim=True)[0]
+        impact /= torch.max(impact, dim=1, keepdim=True)[0] 
         # samples = impact.view(impact.size(0),4,4).data.cpu().numpy()
         # fig = plot(samples)
         # plt.savefig(f'samples/max_class_{step:1}.png', bbox_inches='tight')
@@ -502,8 +632,8 @@ class Simulator:
         return acc,crs
 
     def test(self):
-        # dp = self.get_one_point((0,100))
-        dp = self.get_multi_point([i*100 for i in range(1,8)])
+        dp = self.get_one_point((0,self.num_batches))
+        # dp = self.get_multi_point([i*100 for i in range(1,8)])
         print (dp,self.num_batches)
 
 if __name__ == '__main__':
