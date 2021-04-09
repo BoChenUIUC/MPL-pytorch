@@ -13,8 +13,9 @@ from io import StringIO
 import pickle,sys,os
 import subprocess
 import matplotlib.pyplot as plt
-import matplotlib
+import matplotlib	
 from compression.turbojpeg import TurboJPEG
+from compression.huffman import HuffmanCoding
 
 dataset = 'ucf101-24'
 
@@ -278,9 +279,11 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 	# FAST
 	fast = get_FAST(bgr_frame)
 	# STAR
-	star = get_STAR(bgr_frame)
+	# star = get_STAR(bgr_frame)
+	star = get_SIFT(bgr_frame)
 	# ORB
-	orb = get_ORB(bgr_frame)
+	# orb = get_ORB(bgr_frame)
+	orb = get_GFTT(bgr_frame)
 
 	point_features = [fast, star, orb]
 	map_features = []
@@ -355,6 +358,7 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 	compressed_size = 0
 	original_size = 0
 	tile_size = tilew * tileh
+	huffman = HuffmanCoding()
 	for roi,dsize in zip(ROIs,tile_sizes):
 		x1,y1,x2,y2 = roi
 		crop = bgr_frame[y1:y2,x1:x2].copy()
@@ -367,7 +371,8 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 		else:
 			try:
 				crop_d = cv2.resize(crop, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-				compressed_size += len(pickle.dumps(crop_d, 0))
+				# compressed_size += len(pickle.dumps(crop_d, 0))
+				compressed_size += len(huffman.compress(crop_d.reshape(-1)))
 				crop = cv2.resize(crop_d, dsize=(x2-x1,y2-y1), interpolation=cv2.INTER_LINEAR)
 			except Exception as e:
 				print(repr(e))
@@ -392,9 +397,12 @@ def tile_scaler(image, C_param):
 	dsize = (max(1,int(img_w*C_param)),max(1,int(C_param*img_h)))
 	original_size = len(pickle.dumps(bgr_frame, 0))
 	compressed = cv2.resize(bgr_frame, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-	compressed_size = len(pickle.dumps(compressed, 0))
-	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
 
+	huffman = HuffmanCoding()
+	compressed_size = len(huffman.compress(compressed.reshape(-1)))
+	
+	# compressed_size = len(pickle.dumps(compressed, 0))
+	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
 	end = time.perf_counter()
 	return decompressed,original_size,compressed_size,end-start
 
@@ -523,6 +531,7 @@ def ROI_encoder(image, C_param, jpeg, counter, snapshot=False):
 	num_features = len(point_features)
 	# snapshot features optionally
 	if toSave:
+		# feature_frame = np.zeros((384,384,3))
 		feature_frame = np.zeros(bgr_frame.shape)
 		colors = [(72, 31, 219),(89, 152, 26),(255, 150, 54)]
 		for points,color in zip(point_features,colors):
