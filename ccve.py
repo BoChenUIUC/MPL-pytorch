@@ -603,19 +603,19 @@ if __name__ == "__main__":
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
-	for comp_name in['TiledLegacy']:
-		pareto_front_approx_mobo(comp_name,450)
+	# for comp_name in['TiledLegacy']:
+	# 	pareto_front_approx_mobo(comp_name,450)
 
 	# compute eval metrics
 	# comparePF(500)
 
 	# convert from .log file to pf for eval
-	# configs2paretofront('Tiled_MOBO',500)
+	configs2paretofront('TiledLegacy_MOBO',500)
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	# for name in ['Scale']:
-	# 	evaluation(name)
+	for name in ['TiledLegacy']:
+		evaluation(name)
 
 	# caculate metrics
 	# eval_metrics()
