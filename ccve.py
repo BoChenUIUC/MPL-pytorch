@@ -415,9 +415,8 @@ def evaluation(EXP_NAME):
 		acc,cr = sim.get_one_point(datarange, TF=None, C_param=None)
 		eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 	elif EXP_NAME == 'Scale':
-		for i in range(1,101,10):
-			print(EXP_NAME,i)
-			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i/100.0)
+		for i in range(1,33):
+			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
 			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 	else:
 		for i in range(101):

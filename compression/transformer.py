@@ -394,17 +394,38 @@ def tile_scaler(image, C_param):
 	 
 	# not used for training,but can be used for 
 	# ploting the pareto front
-	dsize = (max(1,int(img_w*C_param)),max(1,int(C_param*img_h)))
+	dsize = (max(1,int(C_param)),max(1,int(C_param)))
 	original_size = len(pickle.dumps(bgr_frame, 0))
 	compressed = cv2.resize(bgr_frame, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
+
+	# 
+	h,w = compressed.shape[:2]
+	ROIs = []
+	tile_w,tile_h = 8,8
+	num_w = int(w/tile_w);num_h = int(h/tile_h)
+	if w%tile_w!=0:num_w +=1
+	if h%tile_h!=0:num_h += 1
+	for row in range(num_h):
+		for col in range(num_w):
+			x1 = col*tile_w; x2 = min((col+1)*tile_w,w); y1 = row*tile_h; y2 = min((row+1)*tile_h,h)
+			ROIs.append([x1,y1,x2,y2])
 
 	huffman = HuffmanCoding()
-	compressed_size = len(huffman.compress(compressed.reshape(-1)))
+	compressed_size2 = 0
+	for roi in ROIs:
+		x1,y1,x2,y2 = roi
+		crop = compressed[y1:y2,x1:x2].copy()
+		compressed_size2 += len(huffman.compress(crop.reshape(-1)))
+	# 
+
+	# compressed_size = len(huffman.compress(compressed.reshape(-1)))
 	
-	# compressed_size = len(pickle.dumps(compressed, 0))
-	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
+	# pre_compressed_size = len(pickle.dumps(compressed, 0))
+	# print(compressed_size,compressed_size2,pre_compressed_size,len(compressed.reshape(-1)),compressed.shape,original_size)
+	# exit(0)
 	end = time.perf_counter()
-	return decompressed,original_size,compressed_size,end-start
+	return decompressed,original_size,compressed_size2,end-start
 
 
 def quality2image(image, quality, jpeg):
