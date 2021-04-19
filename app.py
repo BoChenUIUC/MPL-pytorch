@@ -337,6 +337,64 @@ def check_accuracy(images,targets,model):
     acc1,_ = accuracy(outputs, targets, (1,5))
     return acc1,loss,torch.max(outputs,axis=1)[1]
 
+def deepcod_main(param,datarange):
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    top1 = AverageMeter()
+    top5 = AverageMeter()
+    end = time.time()
+
+    from compression.deepcod import DeepCOD, orthorgonal_regularizer
+    sim_train = Simulator(train=True)
+
+    # discriminator
+    disc_model = sim_train.model
+    train_loader = sim_train.dataloader
+    args = sim_train.opt
+
+    # encoder+decoder
+    gen_model = DeepCOD()
+    if args.device != 'cpu':
+        gen_model.cuda()
+    criterion = nn.CrossEntropyLoss()
+    # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
+
+    disc_model.eval()
+    gen_model.train()
+
+    for epoch in range(1,100):
+        train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
+        for step, (images, targets) in enumerate(train_iter):
+            if datarange is not None:
+                if step<datarange[0]:continue
+                elif step>=datarange[1]:break 
+            if args.device != 'cpu':
+                images = images.cuda()
+                targets = targets.cuda()
+            data_time.update(time.time() - end)
+
+            images = gen_model(images)
+            normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+            images = normalization(images)
+            outputs = disc_model(images)
+            loss = criterion(outputs, targets) + orthorgonal_regularizer(gen_model.sample.weight,0.0001)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            acc1, acc5 = accuracy(outputs, targets, (1, 5))
+            top1.update(acc1[0], targets.shape[0])
+            top5.update(acc5[0], targets.shape[0])
+            batch_time.update(time.time() - end)
+            end = time.time()
+            train_iter.set_description(
+                f"Epoch: {epoch:3}. Data: {data_time.avg:.2f}s. "
+                f"Batch: {batch_time.avg:.2f}s. "
+                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}")
+
+        train_iter.close()
+
 
 def disturb_exp(args, train_loader, model, param, datarange=None):
     from compression.transformer import Transformer
