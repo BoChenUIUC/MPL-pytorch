@@ -10,12 +10,13 @@ from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import spectral_norm
 
-def orthorgonal_regularizer(w,scale,cuda=False):
-	w = w.view(9, 4, 4)
-	w_transpose = torch.transpose(w, 1, 2)
-	w_mul = torch.matmul(w, w_transpose)
-	identity = torch.diag(torch.ones(4))
-	identity = identity.repeat(9,1,1)
+def orthorgonal_regularizer(weight,scale,cuda=False):
+	cin,cout,h,w = weight.size()
+	weight = weight.view(cin*cout, h, w)
+	w_transpose = torch.transpose(weight, 1, 2)
+	w_mul = torch.matmul(weight, w_transpose)
+	identity = torch.diag(torch.ones(h))
+	identity = identity.repeat(cin*cout,1,1)
 	if cuda:
 		identity = identity.cuda()
 	l2norm = torch.nn.MSELoss()
@@ -125,13 +126,13 @@ class DeepCOD(nn.Module):
 
 	def __init__(self, kernel_size=4, num_centers=8):
 		super(DeepCOD, self).__init__()
-		self.sample = nn.Conv2d(3, 3, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
+		self.sample = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1, bias=True)
 		self.centers = torch.rand(num_centers)
 		self.centers = torch.nn.Parameter(self.centers)
 		self.attention_full = Attention_full(3,64)
 		self.resblock_up1 = Resblock_up(64)
-		self.attention_2 =Attention_full(64,64)
-		self.resblock_up2 = Resblock_up(64)
+		# self.attention_2 =Attention_full(64,64)
+		# self.resblock_up2 = Resblock_up(64)
 		# self.attention_2 =Attention_2(64,64)
 		# self.resblock_up2 = Resblock_up(64//4)
 		self.output_conv = Output_conv(64)
@@ -154,18 +155,17 @@ class DeepCOD(nn.Module):
 		# reconstruct
 		x = self.attention_full(x)
 		x = self.resblock_up1(x)
-		x = self.attention_2(x)
-		x = self.resblock_up2(x)
+		# x = self.attention_2(x)
+		# x = self.resblock_up2(x)
 		x = self.output_conv(x)
 		
 		return x
 
 if __name__ == '__main__':
-	image = torch.randn(1,3,8,8)
+	image = torch.randn(1,3,32,32)
 	model = DeepCOD()
 	output = model(image)
 	print(model)
 	print(output.shape)
-	print(model.sample.weight.size())
 	# for p in model.parameters():
 	# 	print(p.shape)
