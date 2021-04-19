@@ -358,6 +358,7 @@ def deepcod_main(param,datarange):
     criterion_mse = nn.MSELoss()
     # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
+    normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
     disc_model.eval()
 
@@ -377,18 +378,24 @@ def deepcod_main(param,datarange):
             data_time.update(time.time() - end)
 
             recon = gen_model(images)
-            normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-            images = normalization(recon)
-            outputs = disc_model(images)
+            # output of generated input
+            recon_norm = normalization(recon)
+            recon_labels,recon_features = disc_model(recon_norm,True)
+            # output of original input
+            images_norm = normalization(images)
+            origin_labels,origin_features = disc_model(images_norm,True)
 
-            loss = criterion_mse(images,recon) +\
-                    criterion_ce(outputs, targets) +\
-                    orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
+            loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
+            loss += criterion_mse(images,recon)
+            loss += criterion_ce(recon_labels, targets)
+            for origin_feat,recon_feat in zip(origin_features,recon_features):
+                loss += criterion_mse(origin_feat,recon_feat)
+                    
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            acc1, acc5 = accuracy(outputs, targets, (1, 5))
+            acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
             batch_time.update(time.time() - end)
@@ -416,7 +423,6 @@ def deepcod_main(param,datarange):
                 data_time.update(time.time() - end)
 
                 images = gen_model(images)
-                normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
                 images = normalization(images)
                 outputs = disc_model(images)
                 loss = criterion(outputs, targets) + orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
