@@ -387,7 +387,7 @@ def deepcod_main(param,datarange):
 
             loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
             loss += criterion_mse(images,recon)
-            loss += criterion_ce(recon_labels, targets)
+            # loss += criterion_ce(recon_labels, targets)
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss += criterion_mse(origin_feat,recon_feat)
                     
