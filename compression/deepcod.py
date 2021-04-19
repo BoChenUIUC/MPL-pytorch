@@ -8,7 +8,7 @@ from torch.nn import functional as F
 from torchvision import transforms
 from torch.utils.data import Dataset
 from torch.autograd import Variable
-from torch.nn.utils import weight_norm
+from torch.nn.utils import spectral_norm
 
 def orthorgonal_regularizer(w,scale,cuda=False):
 	w = w.view(9, 4, 4)
@@ -27,13 +27,13 @@ class Attention_full(nn.Module):
 	def __init__(self, in_channels, out_channels):
 		super(Attention_full, self).__init__()
 		f_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
-		self.f_conv = weight_norm(f_conv)
+		self.f_conv = spectral_norm(f_conv)
 		g_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
-		self.g_conv = weight_norm(g_conv)
+		self.g_conv = spectral_norm(g_conv)
 		h_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
-		self.h_conv = weight_norm(h_conv)
+		self.h_conv = spectral_norm(h_conv)
 		attn_conv = nn.Conv2d(out_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
-		self.attn_conv = weight_norm(attn_conv)
+		self.attn_conv = spectral_norm(attn_conv)
 		self.gamma = torch.nn.Parameter(torch.FloatTensor([1]))
 		self.out_channels = out_channels
 
@@ -57,13 +57,13 @@ class Attention_2(nn.Module):
 	def __init__(self, in_channels, out_channels):
 		super(Attention_2, self).__init__()
 		f_conv = nn.Conv2d(in_channels, out_channels//8, kernel_size=1, stride=1, padding=0, bias=True)
-		self.f_conv = weight_norm(f_conv)
+		self.f_conv = spectral_norm(f_conv)
 		g_conv = nn.Conv2d(in_channels, out_channels//8, kernel_size=1, stride=1, padding=0, bias=True)
-		self.g_conv = weight_norm(g_conv)
+		self.g_conv = spectral_norm(g_conv)
 		h_conv = nn.Conv2d(in_channels, out_channels//4, kernel_size=1, stride=1, padding=0, bias=True)
-		self.h_conv = weight_norm(h_conv)
+		self.h_conv = spectral_norm(h_conv)
 		attn_conv = nn.Conv2d(out_channels//4, out_channels//4, kernel_size=1, stride=1, padding=0, bias=True)
-		self.attn_conv = weight_norm(attn_conv)
+		self.attn_conv = spectral_norm(attn_conv)
 		self.gamma = torch.nn.Parameter(torch.FloatTensor([1]))
 		self.out_channels = out_channels
 
@@ -89,15 +89,15 @@ class Resblock_up(nn.Module):
 		self.bn1 = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
 		self.relu1 = nn.ReLU(inplace=True)
 		deconv1 = nn.ConvTranspose2d(channels, channels, 4, stride=2, padding=1)
-		self.deconv1 = weight_norm(deconv1)
+		self.deconv1 = spectral_norm(deconv1)
 
 		self.bn2 = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
 		self.relu2 = nn.ReLU(inplace=True)
 		deconv2 = nn.ConvTranspose2d(channels, channels, 3, stride=1, padding=1)
-		self.deconv2 = weight_norm(deconv2)
+		self.deconv2 = spectral_norm(deconv2)
 
 		deconv_skip = nn.ConvTranspose2d(channels, channels, 4, stride=2, padding=1)
-		self.deconv_skip = weight_norm(deconv_skip)
+		self.deconv_skip = spectral_norm(deconv_skip)
 
 	def forward(self, x_init):
 		x = self.deconv1(self.relu1(self.bn1(x_init)))
