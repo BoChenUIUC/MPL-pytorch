@@ -88,12 +88,12 @@ class Resblock_up(nn.Module):
 	def __init__(self, channels):
 		super(Resblock_up, self).__init__()
 		self.bn1 = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.relu1 = nn.ReLU(inplace=True)
+		self.relu1 = nn.LeakyReLU()#nn.ReLU(inplace=True)
 		deconv1 = nn.ConvTranspose2d(channels, channels, 4, stride=2, padding=1)
 		self.deconv1 = spectral_norm(deconv1)
 
 		self.bn2 = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.relu2 = nn.ReLU(inplace=True)
+		self.relu2 = nn.LeakyReLU()#nn.ReLU(inplace=True)
 		deconv2 = nn.ConvTranspose2d(channels, channels, 3, stride=1, padding=1)
 		self.deconv2 = spectral_norm(deconv2)
 
@@ -111,7 +111,7 @@ class Output_conv(nn.Module):
 	def __init__(self, channels):
 		super(Output_conv, self).__init__()
 		self.bn = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.relu = nn.ReLU(inplace=True)
+		self.relu = nn.LeakyReLU()#nn.ReLU(inplace=True)
 		self.conv = nn.Conv2d(channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
 
 	def forward(self, x):
@@ -126,13 +126,13 @@ class DeepCOD(nn.Module):
 
 	def __init__(self, kernel_size=4, num_centers=8):
 		super(DeepCOD, self).__init__()
-		self.sample = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1, bias=True)
+		self.sample = nn.Conv2d(3, 3, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.centers = torch.rand(num_centers)
 		self.centers = torch.nn.Parameter(self.centers)
 		self.attention_full = Attention_full(3,64)
 		self.resblock_up1 = Resblock_up(64)
-		# self.attention_2 =Attention_full(64,64)
-		# self.resblock_up2 = Resblock_up(64)
+		self.attention_2 =Attention_full(64,64)
+		self.resblock_up2 = Resblock_up(64)
 		# self.attention_2 =Attention_2(64,64)
 		# self.resblock_up2 = Resblock_up(64//4)
 		self.output_conv = Output_conv(64)
@@ -155,8 +155,8 @@ class DeepCOD(nn.Module):
 		# reconstruct
 		x = self.attention_full(x)
 		x = self.resblock_up1(x)
-		# x = self.attention_2(x)
-		# x = self.resblock_up2(x)
+		x = self.attention_2(x)
+		x = self.resblock_up2(x)
 		x = self.output_conv(x)
 		
 		return x
