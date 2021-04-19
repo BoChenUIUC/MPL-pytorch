@@ -130,9 +130,11 @@ class DeepCOD(nn.Module):
 		self.centers = torch.nn.Parameter(self.centers)
 		self.attention_full = Attention_full(3,64)
 		self.resblock_up1 = Resblock_up(64)
-		self.attention_2 =Attention_2(64,64)
-		self.resblock_up2 = Resblock_up(64//4)
-		self.output_conv = Output_conv(64//4)
+		self.attention_2 =Attention_full(64,64)
+		self.resblock_up2 = Resblock_up(64)
+		# self.attention_2 =Attention_2(64,64)
+		# self.resblock_up2 = Resblock_up(64//4)
+		self.output_conv = Output_conv(64)
 		
 
 	def forward(self, x): 
