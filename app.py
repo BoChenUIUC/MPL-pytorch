@@ -378,7 +378,7 @@ def deepcod_main(param,datarange):
             normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
             images = normalization(images)
             outputs = disc_model(images)
-            loss = criterion(outputs, targets) + orthorgonal_regularizer(gen_model.sample.weight,0.0001)
+            loss = criterion(outputs, targets) + orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

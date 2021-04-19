@@ -10,11 +10,13 @@ from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import weight_norm
 
-def orthorgonal_regularizer(w,scale):
+def orthorgonal_regularizer(w,scale,cuda=False):
 	w = w.view(w.size(0), -1)
 	w_transpose = torch.transpose(w, 0, 1)
 	w_mul = torch.mm(w, w_transpose)
 	identity = torch.diag(torch.ones(3))
+	if cuda:
+		identity.cuda()
 	reg = torch.sub(w_mul, identity)
 	ortho_loss = torch.norm(reg, p=2)
 	return scale * ortho_loss
