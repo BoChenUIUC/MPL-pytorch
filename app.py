@@ -355,7 +355,7 @@ def deepcod_main(param,datarange):
     # encoder+decoder
     gen_model = DeepCOD()
     if args.device != 'cpu':
-        gen_model.cuda()
+        gen_model = gen_model.cuda()
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)

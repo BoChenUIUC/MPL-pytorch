@@ -11,15 +11,15 @@ from torch.autograd import Variable
 from torch.nn.utils import weight_norm
 
 def orthorgonal_regularizer(w,scale,cuda=False):
-	w = w.view(w.size(0), -1)
-	w_transpose = torch.transpose(w, 0, 1)
-	w_mul = torch.mm(w, w_transpose)
-	identity = torch.diag(torch.ones(3))
+	w = w.view(9, 4, 4)
+	w_transpose = torch.transpose(w, 1, 2)
+	w_mul = torch.matmul(w, w_transpose)
+	identity = torch.diag(torch.ones(4))
+	identity = identity.repeat(9,1,1)
 	if cuda:
-		identity.cuda()
-	print(cuda,w_mul,identity)
-	reg = torch.sub(w_mul, identity)
-	ortho_loss = torch.norm(reg, p=2)
+		identity = identity.cuda()
+	l2norm = torch.nn.MSELoss()
+	ortho_loss = l2norm(w_mul, identity)
 	return scale * ortho_loss
 
 class Attention_full(nn.Module):
@@ -164,6 +164,6 @@ if __name__ == '__main__':
 	output = model(image)
 	print(model)
 	print(output.shape)
-	print(model.sample.weight)
+	print(model.sample.weight.size())
 	# for p in model.parameters():
 	# 	print(p.shape)
