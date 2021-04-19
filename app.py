@@ -354,7 +354,8 @@ def deepcod_main(param,datarange):
     gen_model = DeepCOD()
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
-    criterion = nn.CrossEntropyLoss()
+    criterion_ce = nn.CrossEntropyLoss()
+    criterion_mse = nn.MSELoss()
     # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
@@ -375,11 +376,14 @@ def deepcod_main(param,datarange):
                 targets = targets.cuda()
             data_time.update(time.time() - end)
 
-            images = gen_model(images)
+            recon = gen_model(images)
             normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-            images = normalization(images)
+            images = normalization(recon)
             outputs = disc_model(images)
-            loss = criterion(outputs, targets) + orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
+
+            loss = criterion_mse(images,recon) +\
+                    criterion_ce(outputs, targets) +\
+                    orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
