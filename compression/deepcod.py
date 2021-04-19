@@ -17,6 +17,7 @@ def orthorgonal_regularizer(w,scale,cuda=False):
 	identity = torch.diag(torch.ones(3))
 	if cuda:
 		identity.cuda()
+	print(cuda,w_mul,identity)
 	reg = torch.sub(w_mul, identity)
 	ortho_loss = torch.norm(reg, p=2)
 	return scale * ortho_loss
