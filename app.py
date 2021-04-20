@@ -365,10 +365,7 @@ def deepcod_main(param,datarange):
     disc_model.eval()
 
     for epoch in range(1,1001):
-        end = time.time()
         # training
-        batch_time = AverageMeter()
-        data_time = AverageMeter()
         top1 = AverageMeter()
         top5 = AverageMeter()
         gen_model.train()
@@ -377,7 +374,6 @@ def deepcod_main(param,datarange):
             if args.device != 'cpu':
                 images = images.cuda()
                 targets = targets.cuda()
-            data_time.update(time.time() - end)
 
             recon = gen_model(images)
             # output of generated input
@@ -402,20 +398,15 @@ def deepcod_main(param,datarange):
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
-            batch_time.update(time.time() - end)
-            end = time.time()
             train_iter.set_description(
-                f"Train: {epoch:3}. Data: {data_time.avg:.2f}s. "
-                f"Batch: {batch_time.avg:.2f}s. "
-                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                f"reg_loss: {reg_loss.cpu().item():.3f}. feat_loss: {feat_loss.cpu().item():.3f}. ")
+                f"Train: {epoch:3}. "
+                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.6f}. "
+                f"reg_loss: {reg_loss.cpu().item():.6f}. feat_loss: {feat_loss.cpu().item():.6f}. ")
 
         train_iter.close()
 
         # testing
         if epoch%10!=0:continue
-        batch_time = AverageMeter()
-        data_time = AverageMeter()
         top1 = AverageMeter()
         top5 = AverageMeter()
         gen_model.eval()
@@ -425,7 +416,6 @@ def deepcod_main(param,datarange):
                 if args.device != 'cpu':
                     images = images.cuda()
                     targets = targets.cuda()
-                data_time.update(time.time() - end)
 
                 images = gen_model(images)
                 images = normalization(images)
@@ -435,8 +425,6 @@ def deepcod_main(param,datarange):
                 acc1, acc5 = accuracy(outputs, targets, (1, 5))
                 top1.update(acc1[0], targets.shape[0])
                 top5.update(acc5[0], targets.shape[0])
-                batch_time.update(time.time() - end)
-                end = time.time()
                 test_iter.set_description(
                     f"Test: {epoch:3}. Data: {data_time.avg:.2f}s. "
                     f"Batch: {batch_time.avg:.2f}s. "
