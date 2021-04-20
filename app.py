@@ -351,7 +351,9 @@ def deepcod_main(param,datarange):
     disc_model = sim_train.model
 
     # encoder+decoder
+    PATH = 'backup/deepcod.pth'
     gen_model = DeepCOD()
+    # gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
     criterion_ce = nn.CrossEntropyLoss()
@@ -363,12 +365,12 @@ def deepcod_main(param,datarange):
     disc_model.eval()
 
     for epoch in range(1,1001):
+        end = time.time()
         # training
         batch_time = AverageMeter()
         data_time = AverageMeter()
         top1 = AverageMeter()
         top5 = AverageMeter()
-        end = time.time()
         gen_model.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
         for step, (images, targets) in enumerate(train_iter):
@@ -387,7 +389,7 @@ def deepcod_main(param,datarange):
 
             loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
             loss += criterion_mse(images,recon)
-            loss += criterion_ce(recon_labels, targets)
+            # loss += criterion_ce(recon_labels, targets)
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss += criterion_mse(origin_feat,recon_feat)
                     
@@ -408,7 +410,7 @@ def deepcod_main(param,datarange):
         train_iter.close()
 
         # testing
-        if epoch%50!=0:continue
+        if epoch%10!=0:continue
         batch_time = AverageMeter()
         data_time = AverageMeter()
         top1 = AverageMeter()
@@ -438,7 +440,7 @@ def deepcod_main(param,datarange):
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}")
 
         test_iter.close()
-        torch.save(gen_model.state_dict(), 'backup/deepcod.pth')
+        torch.save(gen_model.state_dict(), PATH)
 
 
 def disturb_exp(args, train_loader, model, param, datarange=None):
