@@ -338,7 +338,7 @@ def check_accuracy(images,targets,model):
     return acc1,loss,torch.max(outputs,axis=1)[1]
 
 def deepcod_main(param,datarange):
-    from compression.deepcod import DeepCOD, orthorgonal_regularizer
+    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True)
     sim_test = Simulator(train=False,usemodel=False)
 
@@ -353,13 +353,14 @@ def deepcod_main(param,datarange):
     # encoder+decoder
     PATH = 'backup/deepcod.pth'
     gen_model = DeepCOD()
+    gen_model.apply(init_weights)
     # gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
     criterion_ce = nn.CrossEntropyLoss()
     criterion_mse = nn.MSELoss()
     # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
-    optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
     disc_model.eval()
@@ -383,7 +384,7 @@ def deepcod_main(param,datarange):
             images_norm = normalization(images)
             origin_labels,origin_features = disc_model(images_norm,True)
 
-            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
+            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
             # loss += criterion_mse(images,recon)
             # loss += criterion_ce(recon_labels, targets)
             feat_loss = 0
@@ -420,14 +421,13 @@ def deepcod_main(param,datarange):
                 images = gen_model(images)
                 images = normalization(images)
                 outputs = disc_model(images)
-                loss = criterion_ce(outputs, targets)
 
                 acc1, acc5 = accuracy(outputs, targets, (1, 5))
                 top1.update(acc1[0], targets.shape[0])
                 top5.update(acc5[0], targets.shape[0])
                 test_iter.set_description(
                     f"Test: {epoch:3}. "
-                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}")
+                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. ")
 
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)

@@ -23,10 +23,10 @@ def orthorgonal_regularizer(weight,scale,cuda=False):
 	ortho_loss = l2norm(w_mul, identity)
 	return scale * ortho_loss
 
-class Attention_full(nn.Module):
+class Attention(nn.Module):
 
 	def __init__(self, channels, hidden_channels):
-		super(Attention_full, self).__init__()
+		super(Attention, self).__init__()
 		f_conv = nn.Conv2d(channels, hidden_channels, kernel_size=1, stride=1, padding=0, bias=True)
 		self.f_conv = spectral_norm(f_conv)
 		g_conv = nn.Conv2d(channels, hidden_channels, kernel_size=1, stride=1, padding=0, bias=True)
@@ -86,6 +86,7 @@ class Output_conv(nn.Module):
 		self.bn = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
 		self.relu = nn.LeakyReLU()#nn.ReLU(inplace=True)
 		self.conv = nn.Conv2d(channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
+		self.conv = spectral_norm(self.conv)
 
 	def forward(self, x):
 		x = self.conv(self.relu(self.bn(x)))
@@ -94,6 +95,11 @@ class Output_conv(nn.Module):
 
 		return x
 
+def init_weights(m):
+	if isinstance(m, nn.Conv2d):
+		nn.init.kaiming_normal_(m.weight, mode='fan_out')
+		nn.init.constant_(m.bias, 0)
+
 
 class DeepCOD(nn.Module):
 
@@ -101,11 +107,12 @@ class DeepCOD(nn.Module):
 		super(DeepCOD, self).__init__()
 		out_size = 3
 		self.sample = nn.Conv2d(3, out_size, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
+		self.sample = spectral_norm(self.sample)
 		self.centers = torch.rand(num_centers)
 		self.centers = torch.nn.Parameter(self.centers)
-		self.attention_1 = Attention_full(out_size,out_size)
+		self.attention_1 = Attention(out_size,out_size)
 		self.resblock_up1 = Resblock_up(out_size,64)
-		self.attention_2 =Attention_full(64,64//8)
+		self.attention_2 =Attention(64,64//8)
 		self.resblock_up2 = Resblock_up(64,32)
 		self.output_conv = Output_conv(32)
 		
@@ -139,5 +146,8 @@ if __name__ == '__main__':
 	output = model(image)
 	print(model)
 	print(output.shape)
-	# for p in model.parameters():
-	# 	print(p.shape)
+	weight = torch.diag(torch.ones(4)).repeat(3,3,1,1)
+	print(weight.size())
+	print(model.sample.weight.size())
+	r = orthorgonal_regularizer(model.sample.weight,1,False)
+	print(r)
