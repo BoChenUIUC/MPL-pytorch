@@ -425,7 +425,7 @@ def deepcod_main(param,datarange):
                 images = gen_model(images)
                 images = normalization(images)
                 outputs = disc_model(images)
-                loss = criterion(outputs, targets)
+                loss = criterion_ce(outputs, targets)
 
                 acc1, acc5 = accuracy(outputs, targets, (1, 5))
                 top1.update(acc1[0], targets.shape[0])
