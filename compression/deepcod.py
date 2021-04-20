@@ -10,18 +10,25 @@ from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import spectral_norm
 
-def orthorgonal_regularizer(weight,scale,cuda=False):
-	cin,cout,h,w = weight.size()
-	weight = weight.view(cin*cout, h, w)
-	w_transpose = torch.transpose(weight, 1, 2)
-	w_mul = torch.matmul(weight, w_transpose)
-	identity = torch.diag(torch.ones(h))
-	identity = identity.repeat(cin*cout,1,1)
-	if cuda:
-		identity = identity.cuda()
-	l2norm = torch.nn.MSELoss()
-	ortho_loss = l2norm(w_mul, identity)
-	return scale * ortho_loss
+def orthorgonal_regularizer(w,scale,cuda=False):
+	N, C, H, W = w.size()
+	w = w.view(N*C, H, W)
+	weight_squared = torch.bmm(w, w.permute(0, 2, 1))
+	ones = torch.ones(N * C, H, H, dtype=torch.float32)
+	diag = torch.eye(H, dtype=torch.float32)
+	tmp = ones - diag
+	if cuda:tmp = tmp.cuda()
+	loss_orth = ((weight_squared * tmp) ** 2).sum()
+	return loss_orth*scale
+	# w_transpose = torch.transpose(w, 1, 2)
+	# w_mul = torch.matmul(w, w_transpose)
+	# identity = torch.diag(torch.ones(h))
+	# identity = identity.repeat(cin*cout,1,1)
+	# if cuda:
+	# 	identity = identity.cuda()
+	# l2norm = torch.nn.MSELoss()
+	# ortho_loss = l2norm(w_mul, identity)
+	# return scale * ortho_loss
 
 class Attention(nn.Module):
 
@@ -151,3 +158,6 @@ if __name__ == '__main__':
 	print(model.sample.weight.size())
 	r = orthorgonal_regularizer(model.sample.weight,1,False)
 	print(r)
+	# for name, param in model.named_parameters():
+	# 	print('name is {}'.format(name))
+	# 	print('shape is {}'.format(param.shape))
