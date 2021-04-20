@@ -103,11 +103,11 @@ class DeepCOD(nn.Module):
 		self.sample = nn.Conv2d(3, out_size, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.centers = torch.rand(num_centers)
 		self.centers = torch.nn.Parameter(self.centers)
-		self.attention_1 = Attention_full(out_size,64)
-		self.resblock_up1 = Resblock_up(3,64)
-		self.attention_2 =Attention_full(64,64)
-		self.resblock_up2 = Resblock_up(64,64)
-		self.output_conv = Output_conv(64)
+		self.attention_1 = Attention_full(out_size,out_size)
+		self.resblock_up1 = Resblock_up(out_size,64)
+		self.attention_2 =Attention_full(64,64//8)
+		self.resblock_up2 = Resblock_up(64,32)
+		self.output_conv = Output_conv(32)
 		
 
 	def forward(self, x): 

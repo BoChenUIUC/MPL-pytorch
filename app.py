@@ -406,7 +406,7 @@ def deepcod_main(param,datarange):
         train_iter.close()
 
         # testing
-        if epoch%10!=0:continue
+        if epoch%5!=0:continue
         top1 = AverageMeter()
         top5 = AverageMeter()
         gen_model.eval()
