@@ -25,85 +25,58 @@ def orthorgonal_regularizer(weight,scale,cuda=False):
 
 class Attention_full(nn.Module):
 
-	def __init__(self, in_channels, out_channels):
+	def __init__(self, channels, hidden_channels):
 		super(Attention_full, self).__init__()
-		f_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
+		f_conv = nn.Conv2d(channels, hidden_channels, kernel_size=1, stride=1, padding=0, bias=True)
 		self.f_conv = spectral_norm(f_conv)
-		g_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
+		g_conv = nn.Conv2d(channels, hidden_channels, kernel_size=1, stride=1, padding=0, bias=True)
 		self.g_conv = spectral_norm(g_conv)
-		h_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
+		h_conv = nn.Conv2d(channels, hidden_channels, kernel_size=1, stride=1, padding=0, bias=True)
 		self.h_conv = spectral_norm(h_conv)
-		attn_conv = nn.Conv2d(out_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True)
-		self.attn_conv = spectral_norm(attn_conv)
-		self.gamma = torch.nn.Parameter(torch.FloatTensor([1]))
-		self.out_channels = out_channels
+		v_conv = nn.Conv2d(hidden_channels, channels, kernel_size=1, stride=1, padding=0, bias=True)
+		self.v_conv = spectral_norm(v_conv)
+		self.gamma = torch.nn.Parameter(torch.FloatTensor([0.0]))
+		self.hidden_channels = hidden_channels
+		self.channels = channels
 
 	def forward(self,x):
 		nb, nc, imgh, imgw = x.size() 
 
-		f = (self.f_conv(x)).view(nb,self.out_channels,-1)
-		g = (self.g_conv(x)).view(nb,self.out_channels,-1)
-		h = (self.h_conv(x)).view(nb,self.out_channels,-1)
+		f = (self.f_conv(x)).view(nb,self.hidden_channels,-1)
+		g = (self.g_conv(x)).view(nb,self.hidden_channels,-1)
+		h = (self.h_conv(x)).view(nb,self.hidden_channels,-1)
 
 		s = torch.matmul(f.transpose(1,2),g)
 		beta = F.softmax(s, dim=-1)
 		o = torch.matmul(beta,h.transpose(1,2))
-		o = self.attn_conv(o.transpose(1,2).view(nb,self.out_channels,imgh,imgw))
-		x = self.gamma * o
-
-		return x
-
-class Attention_2(nn.Module):
-
-	def __init__(self, in_channels, out_channels):
-		super(Attention_2, self).__init__()
-		f_conv = nn.Conv2d(in_channels, out_channels//8, kernel_size=1, stride=1, padding=0, bias=True)
-		self.f_conv = spectral_norm(f_conv)
-		g_conv = nn.Conv2d(in_channels, out_channels//8, kernel_size=1, stride=1, padding=0, bias=True)
-		self.g_conv = spectral_norm(g_conv)
-		h_conv = nn.Conv2d(in_channels, out_channels//4, kernel_size=1, stride=1, padding=0, bias=True)
-		self.h_conv = spectral_norm(h_conv)
-		attn_conv = nn.Conv2d(out_channels//4, out_channels//4, kernel_size=1, stride=1, padding=0, bias=True)
-		self.attn_conv = spectral_norm(attn_conv)
-		self.gamma = torch.nn.Parameter(torch.FloatTensor([1]))
-		self.out_channels = out_channels
-
-	def forward(self,x):
-		nb, nc, imgh, imgw = x.size() 
-
-		f = (self.f_conv(x)).view(nb,self.out_channels//8,-1)
-		g = (self.g_conv(x)).view(nb,self.out_channels//8,-1)
-		h = (self.h_conv(x)).view(nb,self.out_channels//4,-1)
-
-		s = torch.matmul(f.transpose(1,2),g)
-		beta = F.softmax(s, dim=-1)
-		o = torch.matmul(beta,h.transpose(1,2))
-		o = self.attn_conv(o.transpose(1,2).view(nb,self.out_channels//4,imgh,imgw))
-		x = self.gamma * o
+		o = self.v_conv(o.transpose(1,2).view(nb,self.hidden_channels,imgh,imgw))
+		x = self.gamma * o + x
 
 		return x
 
 class Resblock_up(nn.Module):
 
-	def __init__(self, channels):
+	def __init__(self, in_channels, out_channels):
 		super(Resblock_up, self).__init__()
-		self.bn1 = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.relu1 = nn.LeakyReLU()#nn.ReLU(inplace=True)
-		deconv1 = nn.ConvTranspose2d(channels, channels, 4, stride=2, padding=1)
+		self.bn1 = nn.BatchNorm2d(in_channels, momentum=0.01, eps=1e-3)
+		self.relu1 = nn.LeakyReLU()
+		deconv1 = nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=1)
 		self.deconv1 = spectral_norm(deconv1)
 
-		self.bn2 = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.relu2 = nn.LeakyReLU()#nn.ReLU(inplace=True)
-		deconv2 = nn.ConvTranspose2d(channels, channels, 3, stride=1, padding=1)
+		self.bn2 = nn.BatchNorm2d(out_channels, momentum=0.01, eps=1e-3)
+		self.relu2 = nn.LeakyReLU()
+		deconv2 = nn.ConvTranspose2d(out_channels, out_channels, 3, stride=1, padding=1)
 		self.deconv2 = spectral_norm(deconv2)
 
-		deconv_skip = nn.ConvTranspose2d(channels, channels, 4, stride=2, padding=1)
+		self.bn3 = nn.BatchNorm2d(in_channels, momentum=0.01, eps=1e-3)
+		self.relu3 = nn.LeakyReLU()
+		deconv_skip = nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=1)
 		self.deconv_skip = spectral_norm(deconv_skip)
 
 	def forward(self, x_init):
 		x = self.deconv1(self.relu1(self.bn1(x_init)))
 		x = self.deconv2(self.relu2(self.bn2(x)))
-		x_init = self.deconv_skip(x_init)
+		x_init = self.deconv_skip(self.relu3(self.bn3(x_init)))
 		return x + x_init
 
 class Output_conv(nn.Module):
@@ -126,15 +99,14 @@ class DeepCOD(nn.Module):
 
 	def __init__(self, kernel_size=4, num_centers=8):
 		super(DeepCOD, self).__init__()
-		self.sample = nn.Conv2d(3, 3, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
+		out_size = 3
+		self.sample = nn.Conv2d(3, out_size, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.centers = torch.rand(num_centers)
 		self.centers = torch.nn.Parameter(self.centers)
-		self.attention_full = Attention_full(3,64)
-		self.resblock_up1 = Resblock_up(64)
+		self.attention_1 = Attention_full(out_size,64)
+		self.resblock_up1 = Resblock_up(3,64)
 		self.attention_2 =Attention_full(64,64)
-		self.resblock_up2 = Resblock_up(64)
-		# self.attention_2 =Attention_2(64,64)
-		# self.resblock_up2 = Resblock_up(64//4)
+		self.resblock_up2 = Resblock_up(64,64)
 		self.output_conv = Output_conv(64)
 		
 
@@ -153,7 +125,7 @@ class DeepCOD(nn.Module):
 		x = softout
 
 		# reconstruct
-		x = self.attention_full(x)
+		x = self.attention_1(x)
 		x = self.resblock_up1(x)
 		x = self.attention_2(x)
 		x = self.resblock_up2(x)
