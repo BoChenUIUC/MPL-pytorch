@@ -387,11 +387,13 @@ def deepcod_main(param,datarange):
             images_norm = normalization(images)
             origin_labels,origin_features = disc_model(images_norm,True)
 
-            loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
-            loss += criterion_mse(images,recon)
+            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
+            # loss += criterion_mse(images,recon)
             # loss += criterion_ce(recon_labels, targets)
+            feat_loss = 0
             for origin_feat,recon_feat in zip(origin_features,recon_features):
-                loss += criterion_mse(origin_feat,recon_feat)
+                feat_loss += criterion_mse(origin_feat,recon_feat)
+            loss = reg_loss + feat_loss
                     
             optimizer.zero_grad()
             loss.backward()
@@ -405,7 +407,8 @@ def deepcod_main(param,datarange):
             train_iter.set_description(
                 f"Train: {epoch:3}. Data: {data_time.avg:.2f}s. "
                 f"Batch: {batch_time.avg:.2f}s. "
-                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}")
+                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
+                f"reg_loss: {reg_loss.cpu().item():.3f}. feat_loss: {feat_loss.cpu().item():.3f}. ")
 
         train_iter.close()
 
