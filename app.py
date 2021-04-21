@@ -404,7 +404,6 @@ def deepcod_main(param,datarange):
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
                 f"reg_loss: {reg_loss.cpu().item():.3f}. feat_loss: {feat_loss.cpu().item():.3f}. "
                 f"recon_loss: {recon_loss.cpu().item():.3f}. ")
-            print(reg_loss.cpu().item(),feat_loss.cpu().item(),recon_loss.cpu().item())
 
         train_iter.close()
 
