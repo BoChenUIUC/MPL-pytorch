@@ -384,7 +384,7 @@ def deepcod_main(param,datarange):
             images_norm = normalization(images)
             origin_labels,origin_features = disc_model(images_norm,True)
 
-            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
+            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
             recon_loss = criterion_mse(images,recon)
             # loss += criterion_ce(recon_labels, targets)
             feat_loss = 0
@@ -427,7 +427,7 @@ def deepcod_main(param,datarange):
                 images_norm = normalization(images)
                 _,origin_features = disc_model(images_norm,True)
 
-                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
+                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
                 recon_loss = criterion_mse(images,recon)
                 feat_loss = 0
                 for origin_feat,recon_feat in zip(origin_features,recon_features):
@@ -445,6 +445,8 @@ def deepcod_main(param,datarange):
 
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
+        with open('training.log','w+') as f:
+            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}.\n")
 
 
 def disturb_exp(args, train_loader, model, param, datarange=None):
