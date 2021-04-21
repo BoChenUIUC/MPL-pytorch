@@ -66,24 +66,21 @@ class Resblock_up(nn.Module):
 	def __init__(self, in_channels, out_channels):
 		super(Resblock_up, self).__init__()
 		self.bn1 = nn.BatchNorm2d(in_channels, momentum=0.01, eps=1e-3)
-		self.relu1 = nn.LeakyReLU()
 		deconv1 = nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=1)
 		self.deconv1 = spectral_norm(deconv1)
 
 		self.bn2 = nn.BatchNorm2d(out_channels, momentum=0.01, eps=1e-3)
-		self.relu2 = nn.LeakyReLU()
 		deconv2 = nn.ConvTranspose2d(out_channels, out_channels, 3, stride=1, padding=1)
 		self.deconv2 = spectral_norm(deconv2)
 
 		self.bn3 = nn.BatchNorm2d(in_channels, momentum=0.01, eps=1e-3)
-		self.relu3 = nn.LeakyReLU()
 		deconv_skip = nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=1)
 		self.deconv_skip = spectral_norm(deconv_skip)
 
 	def forward(self, x_init):
-		x = self.deconv1(self.relu1(self.bn1(x_init)))
-		x = self.deconv2(self.relu2(self.bn2(x)))
-		x_init = self.deconv_skip(self.relu3(self.bn3(x_init)))
+		x = self.deconv1(F.relu(self.bn1(x_init)))
+		x = self.deconv2(F.relu(self.bn2(x)))
+		x_init = self.deconv_skip(F.relu(self.bn3(x_init)))
 		return x + x_init
 
 class Output_conv(nn.Module):
@@ -91,12 +88,11 @@ class Output_conv(nn.Module):
 	def __init__(self, channels):
 		super(Output_conv, self).__init__()
 		self.bn = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.relu = nn.LeakyReLU()#nn.ReLU(inplace=True)
 		self.conv = nn.Conv2d(channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
 		self.conv = spectral_norm(self.conv)
 
 	def forward(self, x):
-		x = self.conv(self.relu(self.bn(x)))
+		x = self.conv(F.relu(self.bn(x)))
 		x = torch.tanh(x)
 		x = (x+1)/2
 
