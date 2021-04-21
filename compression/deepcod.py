@@ -136,7 +136,7 @@ class DeepCOD(nn.Module):
 		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
 		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
 		# dont know how to use hardout, use this temporarily
-		x = softout + (hardout - softout).detach()
+		x = softout
 
 		# reconstruct
 		x = self.attention_1(x)
