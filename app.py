@@ -384,7 +384,7 @@ def deepcod_main(param,datarange):
             images_norm = normalization(images)
             origin_labels,origin_features = disc_model(images_norm,True)
 
-            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
+            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
             recon_loss = criterion_mse(images,recon)
             # loss += criterion_ce(recon_labels, targets)
             feat_loss = 0
@@ -402,8 +402,9 @@ def deepcod_main(param,datarange):
             train_iter.set_description(
                 f"Train: {epoch:3}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                f"reg_loss: {reg_loss.cpu().item():.6f}. feat_loss: {feat_loss.cpu().item():.3f}. "
+                f"reg_loss: {reg_loss.cpu().item():.3f}. feat_loss: {feat_loss.cpu().item():.3f}. "
                 f"recon_loss: {recon_loss.cpu().item():.3f}. ")
+            print(reg_loss.cpu().item(),feat_loss.cpu().item(),recon_loss.cpu().item())
 
         train_iter.close()
 
@@ -427,7 +428,7 @@ def deepcod_main(param,datarange):
                 images_norm = normalization(images)
                 _,origin_features = disc_model(images_norm,True)
 
-                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
+                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,args.device != 'cpu')
                 recon_loss = criterion_mse(images,recon)
                 feat_loss = 0
                 for origin_feat,recon_feat in zip(origin_features,recon_features):
@@ -440,7 +441,7 @@ def deepcod_main(param,datarange):
                 test_iter.set_description(
                     f" Test: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    f"reg_loss: {reg_loss.cpu().item():.6f}. feat_loss: {feat_loss.cpu().item():.3f}. "
+                    f"reg_loss: {reg_loss.cpu().item():.3f}. feat_loss: {feat_loss.cpu().item():.3f}. "
                     f"recon_loss: {recon_loss.cpu().item():.3f}. ")
 
         test_iter.close()
