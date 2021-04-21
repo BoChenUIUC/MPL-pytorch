@@ -365,6 +365,8 @@ def deepcod_main(param,datarange):
 
     disc_model.eval()
 
+    with open('training.log','w') as f:
+        f.write('')
     for epoch in range(1,1001):
         # training
         top1 = AverageMeter()
@@ -386,11 +388,11 @@ def deepcod_main(param,datarange):
 
             reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
             recon_loss = criterion_mse(images,recon)
-            # loss += criterion_ce(recon_labels, targets)
+            label_loss = criterion_ce(recon_labels, targets)
             feat_loss = 0
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 feat_loss += criterion_mse(origin_feat,recon_feat)
-            loss = reg_loss + recon_loss + feat_loss
+            loss = reg_loss + recon_loss + feat_loss + label_loss
                     
             optimizer.zero_grad()
             loss.backward()
@@ -402,8 +404,8 @@ def deepcod_main(param,datarange):
             train_iter.set_description(
                 f"Train: {epoch:3}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                f"reg_loss: {reg_loss.cpu().item():.3f}. feat_loss: {feat_loss.cpu().item():.3f}. "
-                f"recon_loss: {recon_loss.cpu().item():.3f}. ")
+                f"reg: {reg_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
+                f"recon: {recon_loss.cpu().item():.3f}. label: {label_loss.cpu().item():.3f}. ")
 
         train_iter.close()
 
@@ -429,10 +431,11 @@ def deepcod_main(param,datarange):
 
                 reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
                 recon_loss = criterion_mse(images,recon)
+                label_loss = criterion_ce(recon_labels, targets)
                 feat_loss = 0
                 for origin_feat,recon_feat in zip(origin_features,recon_features):
                     feat_loss += criterion_mse(origin_feat,recon_feat)
-                loss = reg_loss + recon_loss + feat_loss
+                loss = reg_loss + recon_loss + feat_loss + label_loss
 
                 acc1, acc5 = accuracy(outputs, targets, (1, 5))
                 top1.update(acc1[0], targets.shape[0])
@@ -440,13 +443,15 @@ def deepcod_main(param,datarange):
                 test_iter.set_description(
                     f" Test: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    f"reg_loss: {reg_loss.cpu().item():.3f}. feat_loss: {feat_loss.cpu().item():.3f}. "
-                    f"recon_loss: {recon_loss.cpu().item():.3f}. ")
+                    f"reg: {reg_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
+                    f"recon: {recon_loss.cpu().item():.3f}. label: {label_loss.cpu().item():.3f}. ")
 
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
-        with open('training.log','w+') as f:
-            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}.\n")
+        with open('training.log','a') as f:
+            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
+                    f"reg: {reg_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
+                    f"recon: {recon_loss.cpu().item():.3f}. label: {label_loss.cpu().item():.3f}.\n")
 
 
 def disturb_exp(args, train_loader, model, param, datarange=None):
