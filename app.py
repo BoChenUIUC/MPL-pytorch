@@ -438,9 +438,9 @@ def deepcod_main(param,datarange):
                 top1.update(acc1[0], targets.shape[0])
                 top5.update(acc5[0], targets.shape[0])
                 test_iter.set_description(
-                    f"Test: {epoch:3}. "
-                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.6f}. "
-                    f"reg_loss: {reg_loss.cpu().item():.6f}. feat_loss: {feat_loss.cpu().item():.6f}. "
+                    f" Test: {epoch:3}. "
+                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
+                    f"reg_loss: {reg_loss.cpu().item():.6f}. feat_loss: {feat_loss.cpu().item():.3f}. "
                     f"recon_loss: {recon_loss.cpu().item():.3f}. ")
 
         test_iter.close()
