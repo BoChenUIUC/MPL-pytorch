@@ -388,7 +388,7 @@ def deepcod_main(param,datarange):
 
             reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
             recon_loss = criterion_mse(images,recon)
-            label_loss = criterion_ce(recon_labels, targets)*0.01
+            label_loss = criterion_ce(recon_labels, targets)*0.1
             feat_loss = 0
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 feat_loss += criterion_mse(origin_feat,recon_feat)
@@ -431,12 +431,12 @@ def deepcod_main(param,datarange):
 
                 reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,args.device != 'cpu')
                 recon_loss = criterion_mse(images,recon)
-                label_loss = criterion_ce(recon_labels, targets)*0.01
+                label_loss = criterion_ce(recon_labels, targets)*0.1
                 feat_loss = 0
                 for origin_feat,recon_feat in zip(origin_features,recon_features):
                     feat_loss += criterion_mse(origin_feat,recon_feat)
                 loss = reg_loss + recon_loss + feat_loss + label_loss
-                origin_loss = criterion_ce(origin_labels, targets)*0.01
+                origin_loss = criterion_ce(origin_labels, targets)*0.1
 
                 acc1, _ = accuracy(recon_labels, targets, (1, 5))
                 acc5, _ = accuracy(origin_labels, targets, (1, 5))
@@ -445,7 +445,7 @@ def deepcod_main(param,datarange):
                 test_iter.set_description(
                     f" Test: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    f"orig: {origin_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
+                    f"ori: {origin_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
                     f"recon: {recon_loss.cpu().item():.3f}. label: {label_loss.cpu().item():.3f}. ")
 
         test_iter.close()
