@@ -86,19 +86,43 @@ class Resblock_up(nn.Module):
 		x_init = self.deconv_skip(F.relu(self.bn3(x_init)))
 		return x + x_init
 
-class Encoder(nn.Module):
+class ComplexEncoder(nn.Module):
 
-	def __init__(self, in_channels, out_channels):
-		super(Encoder, self).__init__()
-		self.bn1 = nn.BatchNorm2d(in_channels, momentum=0.01, eps=1e-3)
-		self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1, bias=True)
+	def __init__(self, channels):
+		super(ComplexEncoder, self).__init__()
+		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		self.conv1 = nn.Conv2d(3, channels, kernel_size=3, stride=2, padding=1, bias=True)
 
-		self.bn2 = nn.BatchNorm2d(out_channels, momentum=0.01, eps=1e-3)
-		self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, bias=True)
+		self.bn2 = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
+		self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, stride=2, padding=1, bias=True)
 
 	def forward(self, x):
 		x = self.conv1(F.relu(self.bn1(x)))
 		x = self.conv2(F.relu(self.bn2(x)))
+
+		return x
+
+class LightweightEncoder(nn.Module):
+
+	def __init__(self, channels, kernel_size=4, num_centers=8):
+		super(LightweightEncoder, self).__init__()
+		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
+		self.sample = spectral_norm(self.sample)
+		self.centers = torch.nn.Parameter(torch.rand(num_centers))
+
+	def forward(self, x):
+		# sample from input
+		x = self.sample(x)
+
+		# quantization
+		xsize = list(x.size())
+		x = x.view(*(xsize + [1]))
+		quant_dist = torch.pow(x-self.centers, 2)
+		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
+		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
+		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
+		# dont know how to use hardout, use this temporarily
+		x = softout
 
 		return x
 
@@ -129,9 +153,8 @@ class DeepCOD(nn.Module):
 	def __init__(self, kernel_size=4, num_centers=8):
 		super(DeepCOD, self).__init__()
 		out_size = 3
-		self.sample = nn.Conv2d(3, out_size, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
-		self.sample = spectral_norm(self.sample)
-		self.centers = torch.nn.Parameter(torch.rand(num_centers))
+		# self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=8)
+		self.encoder = ComplexEncoder(out_size)
 		self.attention_1 = Attention(out_size,64)
 		self.resblock_up1 = Resblock_up(out_size,64)
 		self.attention_2 =Attention(64,64//8)
@@ -140,18 +163,7 @@ class DeepCOD(nn.Module):
 		
 
 	def forward(self, x): 
-		# sample from input
-		x = self.sample(x)
-
-		# # quantization
-		# xsize = list(x.size())
-		# x = x.view(*(xsize + [1]))
-		# quant_dist = torch.pow(x-self.centers, 2)
-		# softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
-		# maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
-		# hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
-		# # dont know how to use hardout, use this temporarily
-		# x = softout
+		x = self.encoder(x)
 
 		# reconstruct
 		x = self.attention_1(x)
@@ -173,6 +185,6 @@ if __name__ == '__main__':
 	# print(model.sample.weight.size())
 	# r = orthorgonal_regularizer(model.sample.weight,1,False)
 	# print(r)
-	# for name, param in model.named_parameters():
-	# 	print('name is {}'.format(name))
-	# 	print('shape is {}'.format(param.shape))
+	for name, param in model.named_parameters():
+		print('name is {}'.format(name))
+		print('shape is {}'.format(param.shape))
