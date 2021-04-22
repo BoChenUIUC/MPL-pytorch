@@ -153,8 +153,7 @@ class DeepCOD(nn.Module):
 	def __init__(self, kernel_size=4, num_centers=8):
 		super(DeepCOD, self).__init__()
 		out_size = 3
-		# self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=8)
-		self.encoder = ComplexEncoder(out_size)
+		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=8)
 		self.attention_1 = Attention(out_size,64)
 		self.resblock_up1 = Resblock_up(out_size,64)
 		self.attention_2 =Attention(64,64//8)
@@ -182,9 +181,9 @@ if __name__ == '__main__':
 	# print(output.shape)
 	# weight = torch.diag(torch.ones(4)).repeat(3,3,1,1)
 	# print(weight.size())
-	# print(model.sample.weight.size())
+	print(model.encoder.sample.weight.size())
 	# r = orthorgonal_regularizer(model.sample.weight,1,False)
 	# print(r)
-	for name, param in model.named_parameters():
-		print('name is {}'.format(name))
-		print('shape is {}'.format(param.shape))
+	# for name, param in model.named_parameters():
+	# 	print('name is {}'.format(name))
+	# 	print('shape is {}'.format(param.shape))
