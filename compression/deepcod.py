@@ -63,14 +63,16 @@ class Discriminator(nn.Module):
 		y1 = self.fc1(x)
 		return y1
 
-def compute_gradient_penalty(D, real_samples, fake_samples):
+def compute_gradient_penalty(D, real_samples, fake_samples, cuda):
 	"""Calculates the gradient penalty loss for WGAN GP"""
 	# Random weight term for interpolation between real and fake samples
-	alpha = torch.Tensor(np.random.random((real_samples.size(0), 1, 1, 1))).cuda()
+	alpha = torch.Tensor(np.random.random((real_samples.size(0), 1, 1, 1)))
+	if cuda:alpha = alpha.cuda()
 	# Get random interpolation between real and fake samples
 	interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
 	d_interpolates = D(interpolates)
-	fake = Variable(torch.Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False).cuda()
+	fake = Variable(torch.Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
+	if cuda: fake = fake.cuda()
 	# Get gradient w.r.t. interpolates
 	gradients = torch.autograd.grad(
 		outputs=d_interpolates,
@@ -228,11 +230,11 @@ class DeepCOD(nn.Module):
 		super(DeepCOD, self).__init__()
 		out_size = 3
 		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=8)
-		self.attention_1 = Attention(out_size,64)
-		self.resblock_up1 = Resblock_up(out_size,64)
-		self.attention_2 =Attention(64,64//8)
-		self.resblock_up2 = Resblock_up(64,32)
-		self.output_conv = Output_conv(32)
+		self.attention_1 = Attention(out_size,no_of_hidden_units)
+		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
+		self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
+		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
+		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
 	def forward(self, x): 

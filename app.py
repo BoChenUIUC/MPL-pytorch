@@ -373,8 +373,8 @@ def deepcod_main(param,datarange):
 
     app_model.eval()
 
-    with open('training.log','w') as f:
-        f.write('')
+    with open('training.log','a') as f:
+        f.write('-----------start---------')
     for epoch in range(1,1001):
         # training
         top1 = AverageMeter()
@@ -397,12 +397,11 @@ def deepcod_main(param,datarange):
             _,origin_features = app_model(normalization(images),True)
             fake_validity = discriminator(norm_recon)
 
-            reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-            # label_loss = criterion_ce(recon_labels, targets)
-            feat_loss = 0
-            for origin_feat,recon_feat in zip(origin_features,recon_features):
-                feat_loss += criterion_mse(origin_feat,recon_feat)
-            loss_g = feat_loss + reg_loss - torch.mean(fake_validity)
+            loss0 = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
+            loss0 += criterion_ce(recon_labels, targets)
+            # for origin_feat,recon_feat in zip(origin_features,recon_features):
+            #     feat_loss += criterion_mse(origin_feat,recon_feat)
+            loss_g = loss0 - torch.mean(fake_validity)
                     
             loss_g.backward()
             optimizer_g.step()
@@ -419,7 +418,7 @@ def deepcod_main(param,datarange):
             fake_imgs = normalization(recon)
             fake_validity = discriminator(fake_imgs)
             # Gradient penalty
-            gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data)
+            gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data, args.device != 'cpu')
             # Adversarial loss
             loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
 
@@ -434,6 +433,7 @@ def deepcod_main(param,datarange):
                 f"Train: {epoch:3}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss_g: {loss_g.cpu().item():.3f}. "
                 f"loss_d: {loss_d.cpu().item():.3f}. "
+                f"loss0: {loss0.cpu().item():.3f}. "
                 )
 
         train_iter.close()
@@ -459,12 +459,11 @@ def deepcod_main(param,datarange):
                 _,origin_features = app_model(images_norm,True)
 
                 reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-                # label_loss = criterion_ce(recon_labels, targets)
-                feat_loss = 0
-                for origin_feat,recon_feat in zip(origin_features,recon_features):
-                    feat_loss += criterion_mse(origin_feat,recon_feat)
-                loss = feat_loss + reg_loss
-                # origin_loss = criterion_ce(origin_labels, targets) #0.17
+                label_loss = criterion_ce(recon_labels, targets)
+                # feat_loss = 0
+                # for origin_feat,recon_feat in zip(origin_features,recon_features):
+                #     feat_loss += criterion_mse(origin_feat,recon_feat)
+                loss = label_loss + reg_loss #0.17,0.93
 
                 acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
                 top1.update(acc1[0], targets.shape[0])
@@ -472,17 +471,17 @@ def deepcod_main(param,datarange):
                 test_iter.set_description(
                     f" Test: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    f"reg: {reg_loss.cpu().item():.3f}. "
-                    f"fea: {feat_loss.cpu().item():.3f}. "
+                    # f"reg: {reg_loss.cpu().item():.3f}. "
+                    # f"fea: {feat_loss.cpu().item():.3f}. "
                     # f"lab: {label_loss.cpu().item():.3f}. "
                     )
 
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
         with open('training.log','a') as f:
-            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    f"reg: {reg_loss.cpu().item():.3f}. "
-                    f"fea: {feat_loss.cpu().item():.3f}. \n"
+            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. \n"
+                    # f"reg: {reg_loss.cpu().item():.3f}. "
+                    # f"fea: {feat_loss.cpu().item():.3f}. \n"
                     # f"lab: {label_loss.cpu().item():.3f}.\n"
                     )
 
