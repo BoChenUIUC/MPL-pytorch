@@ -10,6 +10,80 @@ from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import spectral_norm
 
+no_of_hidden_units = 196
+class Discriminator(nn.Module):
+	def __init__(self):
+		super(Discriminator, self).__init__()
+		self.conv1 = nn.Conv2d(3, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
+		self.ln1 = nn.LayerNorm([no_of_hidden_units,32,32])
+		self.lrelu1 = nn.LeakyReLU()
+
+		self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
+		self.ln2 = nn.LayerNorm([no_of_hidden_units,16,16])
+		self.lrelu2 = nn.LeakyReLU()
+
+		self.conv3 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
+		self.ln3 = nn.LayerNorm([no_of_hidden_units,16,16])
+		self.lrelu3 = nn.LeakyReLU()
+
+		self.conv4 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
+		self.ln4 = nn.LayerNorm([no_of_hidden_units,8,8])
+		self.lrelu4 = nn.LeakyReLU()
+
+		self.conv5 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
+		self.ln5 = nn.LayerNorm([no_of_hidden_units,8,8])
+		self.lrelu5 = nn.LeakyReLU()
+
+		self.conv6 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
+		self.ln6 = nn.LayerNorm([no_of_hidden_units,8,8])
+		self.lrelu6 = nn.LeakyReLU()
+
+		self.conv7 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
+		self.ln7 = nn.LayerNorm([no_of_hidden_units,8,8])
+		self.lrelu7 = nn.LeakyReLU()
+
+		self.conv8 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
+		self.ln8 = nn.LayerNorm([no_of_hidden_units,4,4])
+		self.lrelu8 = nn.LeakyReLU()
+
+		self.pool = nn.MaxPool2d(4, 4)
+		self.fc1 = nn.Linear(no_of_hidden_units, 1)
+
+	def forward(self, x, extract_features=0):
+		x = self.ln1(self.lrelu1(self.conv1(x)))
+		x = self.ln2(self.lrelu2(self.conv2(x)))
+		x = self.ln3(self.lrelu3(self.conv3(x)))
+		x = self.ln4(self.lrelu4(self.conv4(x)))
+		x = self.ln5(self.lrelu5(self.conv5(x)))
+		x = self.ln6(self.lrelu6(self.conv6(x)))
+		x = self.ln7(self.lrelu7(self.conv7(x)))
+		x = self.ln8(self.lrelu8(self.conv8(x)))
+		x = self.pool(x)
+		x = x.view(-1, no_of_hidden_units)
+		y1 = self.fc1(x)
+		return y1
+
+def compute_gradient_penalty(D, real_samples, fake_samples):
+	"""Calculates the gradient penalty loss for WGAN GP"""
+	# Random weight term for interpolation between real and fake samples
+	alpha = torch.Tensor(np.random.random((real_samples.size(0), 1, 1, 1)))
+	# Get random interpolation between real and fake samples
+	interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
+	d_interpolates = D(interpolates)
+	fake = Variable(torch.Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
+	# Get gradient w.r.t. interpolates
+	gradients = torch.autograd.grad(
+		outputs=d_interpolates,
+		inputs=interpolates,
+		grad_outputs=fake,
+		create_graph=True,
+		retain_graph=True,
+		only_inputs=True,
+	)[0]
+	gradients = gradients.view(gradients.size(0), -1)
+	gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+	return gradient_penalty
+
 def orthorgonal_regularizer(w,scale,cuda=False):
 	N, C, H, W = w.size()
 	w = w.view(N*C, H, W)
