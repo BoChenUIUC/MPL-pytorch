@@ -365,7 +365,7 @@ def deepcod_main(param,datarange):
 
     disc_model.eval()
 
-    with open('training.log.0','w') as f:
+    with open('training.log','w') as f:
         f.write('')
     for epoch in range(1,1001):
         # training
