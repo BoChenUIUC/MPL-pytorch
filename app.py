@@ -361,6 +361,8 @@ def deepcod_main(param,datarange):
     # discriminator
     lambda_gp = 10
     discriminator = Discriminator()
+    if args.device != 'cpu':
+        discriminator = discriminator.cuda()
 
     criterion_ce = nn.CrossEntropyLoss()
     criterion_mse = nn.MSELoss()
