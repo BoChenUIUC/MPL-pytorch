@@ -86,6 +86,22 @@ class Resblock_up(nn.Module):
 		x_init = self.deconv_skip(F.relu(self.bn3(x_init)))
 		return x + x_init
 
+class Encoder(nn.Module):
+
+	def __init__(self, in_channels, out_channels):
+		super(Encoder, self).__init__()
+		self.bn1 = nn.BatchNorm2d(in_channels, momentum=0.01, eps=1e-3)
+		self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1, bias=True)
+
+		self.bn2 = nn.BatchNorm2d(out_channels, momentum=0.01, eps=1e-3)
+		self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, bias=True)
+
+	def forward(self, x):
+		x = self.conv1(F.relu(self.bn1(x)))
+		x = self.conv2(F.relu(self.bn2(x)))
+
+		return x
+
 class Output_conv(nn.Module):
 
 	def __init__(self, channels):
@@ -115,9 +131,8 @@ class DeepCOD(nn.Module):
 		out_size = 3
 		self.sample = nn.Conv2d(3, out_size, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
-		self.centers = torch.rand(num_centers)
-		self.centers = torch.nn.Parameter(self.centers)
-		self.attention_1 = Attention(out_size,out_size)
+		self.centers = torch.nn.Parameter(torch.rand(num_centers))
+		self.attention_1 = Attention(out_size,64)
 		self.resblock_up1 = Resblock_up(out_size,64)
 		self.attention_2 =Attention(64,64//8)
 		self.resblock_up2 = Resblock_up(64,32)
@@ -128,15 +143,15 @@ class DeepCOD(nn.Module):
 		# sample from input
 		x = self.sample(x)
 
-		# quantization
-		xsize = list(x.size())
-		x = x.view(*(xsize + [1]))
-		quant_dist = torch.pow(x-self.centers, 2)
-		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
-		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
-		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
-		# dont know how to use hardout, use this temporarily
-		x = softout
+		# # quantization
+		# xsize = list(x.size())
+		# x = x.view(*(xsize + [1]))
+		# quant_dist = torch.pow(x-self.centers, 2)
+		# softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
+		# maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
+		# hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
+		# # dont know how to use hardout, use this temporarily
+		# x = softout
 
 		# reconstruct
 		x = self.attention_1(x)
@@ -152,12 +167,12 @@ if __name__ == '__main__':
 	model = DeepCOD()
 	output = model(image)
 	print(model)
-	print(output.shape)
-	weight = torch.diag(torch.ones(4)).repeat(3,3,1,1)
-	print(weight.size())
-	print(model.sample.weight.size())
-	r = orthorgonal_regularizer(model.sample.weight,1,False)
-	print(r)
+	# print(output.shape)
+	# weight = torch.diag(torch.ones(4)).repeat(3,3,1,1)
+	# print(weight.size())
+	# print(model.sample.weight.size())
+	# r = orthorgonal_regularizer(model.sample.weight,1,False)
+	# print(r)
 	# for name, param in model.named_parameters():
 	# 	print('name is {}'.format(name))
 	# 	print('shape is {}'.format(param.shape))
