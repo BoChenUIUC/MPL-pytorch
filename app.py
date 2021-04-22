@@ -404,7 +404,7 @@ def deepcod_main(param,datarange):
             train_iter.set_description(
                 f"Train: {epoch:3}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                f"reg: {reg_loss.cpu().item():.3f}. fea: {fea_loss.cpu().item():.3f}. "
+                f"reg: {reg_loss.cpu().item():.3f}. fea: {feat_loss.cpu().item():.3f}. "
                 f"lab: {label_loss.cpu().item():.3f}. ")
 
         train_iter.close()
@@ -444,14 +444,14 @@ def deepcod_main(param,datarange):
                 test_iter.set_description(
                     f" Test: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    f"reg: {reg_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
+                    f"reg: {reg_loss.cpu().item():.3f}. fea: {feat_loss.cpu().item():.3f}. "
                     f"lab: {label_loss.cpu().item():.3f}. ")
 
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
         with open('training.log','a') as f:
             f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    f"reg: {reg_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
+                    f"reg: {reg_loss.cpu().item():.3f}. fea: {feat_loss.cpu().item():.3f}. "
                     f"lab: {label_loss.cpu().item():.3f}.\n")
 
 
