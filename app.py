@@ -444,7 +444,7 @@ def deepcod_main(param,datarange):
                 test_iter.set_description(
                     f" Test: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    f"reg: {origin_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
+                    f"reg: {reg_loss.cpu().item():.3f}. feat: {feat_loss.cpu().item():.3f}. "
                     f"recon: {recon_loss.cpu().item():.3f}. label: {label_loss.cpu().item():.3f}. ")
 
         test_iter.close()
