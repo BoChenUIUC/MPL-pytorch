@@ -349,6 +349,7 @@ def deepcod_main(param,datarange):
 
     # discriminator
     app_model = sim_train.model
+    app_model.eval()
 
     # encoder+decoder
     PATH = 'backup/deepcod.pth'
@@ -371,9 +372,8 @@ def deepcod_main(param,datarange):
     optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
-    app_model.eval()
 
-    with open('training.log','a') as f:
+    with open('training.log.1','a') as f:
         f.write('-----------start---------')
     for epoch in range(1,1001):
         # training
@@ -478,7 +478,7 @@ def deepcod_main(param,datarange):
 
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
-        with open('training.log','a') as f:
+        with open('training.log.1','a') as f:
             f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. \n"
                     # f"reg: {reg_loss.cpu().item():.3f}. "
                     # f"fea: {feat_loss.cpu().item():.3f}. \n"
