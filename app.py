@@ -392,8 +392,7 @@ def deepcod_main(param,datarange):
             #     p.requires_grad_(False)
             optimizer_g.zero_grad()
             recon = gen_model(images)
-            norm_recon = normalization(recon)
-            recon_labels,recon_features = app_model(norm_recon,True)
+            recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
             # fake_validity = discriminator(norm_recon)
 
@@ -439,7 +438,7 @@ def deepcod_main(param,datarange):
         train_iter.close()
 
         # testing
-        if epoch%5!=0:continue
+        # if epoch%5!=0:continue
         top1 = AverageMeter()
         top5 = AverageMeter()
         gen_model.eval()

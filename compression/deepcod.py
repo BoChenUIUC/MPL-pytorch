@@ -63,6 +63,45 @@ class Discriminator(nn.Module):
 		y1 = self.fc1(x)
 		return y1
 
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+        self.conv2 = spectral_norm(self.conv2)
+        self.bn2 = (nn.BatchNorm2d(no_of_hidden_units))
+
+        self.conv3 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+        self.conv3 = spectral_norm(self.conv3)
+        self.bn3 = nn.BatchNorm2d(no_of_hidden_units)
+
+        self.conv4 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+        self.conv4 = spectral_norm(self.conv4)
+        self.bn4 = nn.BatchNorm2d(no_of_hidden_units)
+
+        self.conv5 = nn.ConvTranspose2d(no_of_hidden_units, no_of_hidden_units, 4, stride=2, padding=1)
+        self.conv5 = spectral_norm(self.conv5)
+        self.bn5 = nn.BatchNorm2d(no_of_hidden_units)
+
+        self.conv6 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+        self.conv6 = spectral_norm(self.conv6)
+        self.bn6 = nn.BatchNorm2d(no_of_hidden_units)
+
+        self.conv7 = nn.ConvTranspose2d(no_of_hidden_units, no_of_hidden_units, 4, stride=2, padding=1)
+        self.conv7 = spectral_norm(self.conv7)
+        self.bn7 = nn.BatchNorm2d(no_of_hidden_units)
+
+        self.conv8 = nn.Conv2d(no_of_hidden_units, 3, 3, stride=1, padding=1)
+        self.conv8 = spectral_norm(self.conv8)
+    def forward(self,x):
+        x = self.bn2(F.relu(self.conv2(x)))
+        x = self.bn3(F.relu(self.conv3(x)))
+        x = self.bn4(F.relu(self.conv4(x)))
+        x = self.bn5(F.relu(self.conv5(x)))
+        x = self.bn6(F.relu(self.conv6(x)))
+        x = self.bn7(F.relu(self.conv7(x)))
+        x = self.conv8(x)
+        return torch.tanh(x)
+
 def compute_gradient_penalty(D, real_samples, fake_samples, cuda):
 	"""Calculates the gradient penalty loss for WGAN GP"""
 	# Random weight term for interpolation between real and fake samples
