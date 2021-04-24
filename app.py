@@ -388,42 +388,42 @@ def deepcod_main(param,datarange):
                 targets = targets.cuda()
 
             # generator update
-            for p in discriminator.parameters():
-                p.requires_grad_(False)
+            # for p in discriminator.parameters():
+            #     p.requires_grad_(False)
             optimizer_g.zero_grad()
             recon = gen_model(images)
             norm_recon = normalization(recon)
             recon_labels,recon_features = app_model(norm_recon,True)
             _,origin_features = app_model(normalization(images),True)
-            fake_validity = discriminator(norm_recon)
+            # fake_validity = discriminator(norm_recon)
 
-            loss0 = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
+            loss0 = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.1,args.device != 'cpu')
             # loss0 += criterion_ce(recon_labels, targets)
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss0 += criterion_mse(origin_feat,recon_feat)
-            loss_g = loss0 - torch.mean(fake_validity)
+            loss_g = loss0 #- torch.mean(fake_validity)
                     
             loss_g.backward()
             optimizer_g.step()
-            for p in discriminator.parameters():
-                p.requires_grad_(True)
+            # for p in discriminator.parameters():
+            #     p.requires_grad_(True)
 
-            # discriminator update
-            optimizer_d.zero_grad()
-            # Real images
-            real_imgs = normalization(images)
-            real_validity = discriminator(real_imgs)
-            # Fake images
-            recon = gen_model(images)
-            fake_imgs = normalization(recon)
-            fake_validity = discriminator(fake_imgs)
-            # Gradient penalty
-            gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data, args.device != 'cpu')
-            # Adversarial loss
-            loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
+            # # discriminator update
+            # optimizer_d.zero_grad()
+            # # Real images
+            # real_imgs = normalization(images)
+            # real_validity = discriminator(real_imgs)
+            # # Fake images
+            # recon = gen_model(images)
+            # fake_imgs = normalization(recon)
+            # fake_validity = discriminator(fake_imgs)
+            # # Gradient penalty
+            # gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data, args.device != 'cpu')
+            # # Adversarial loss
+            # loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
 
-            loss_d.backward()
-            optimizer_d.step()
+            # loss_d.backward()
+            # optimizer_d.step()
             
 
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
@@ -432,8 +432,8 @@ def deepcod_main(param,datarange):
             train_iter.set_description(
                 f"Train: {epoch:3}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss_g: {loss_g.cpu().item():.3f}. "
-                f"loss_d: {loss_d.cpu().item():.3f}. "
-                f"loss0: {loss0.cpu().item():.3f}. "
+                # f"loss_d: {loss_d.cpu().item():.3f}. "
+                # f"loss0: {loss0.cpu().item():.3f}. "
                 )
 
         train_iter.close()
