@@ -381,7 +381,7 @@ def deepcod_main(param,datarange):
         top5 = AverageMeter()
         gen_model.train()
         # discriminator.train()
-        train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
+        train_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
                 images = images.cuda()
@@ -438,42 +438,41 @@ def deepcod_main(param,datarange):
         train_iter.close()
 
         # testing
-        if epoch%5!=0:continue
+        # if epoch%5!=0:continue
         top1 = AverageMeter()
         top5 = AverageMeter()
         # gen_model.eval()
         test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
-        with torch.no_grad():
-            for step, (images, targets) in enumerate(test_iter):
-                if args.device != 'cpu':
-                    images = images.cuda()
-                    targets = targets.cuda()
+        for step, (images, targets) in enumerate(test_iter):
+            if args.device != 'cpu':
+                images = images.cuda()
+                targets = targets.cuda()
 
-                recon = gen_model(images)
-                # output of generated input
-                recon_norm = normalization(recon)
-                recon_labels,recon_features = app_model(recon_norm,True)
-                # output of original input
-                images_norm = normalization(images)
-                _,origin_features = app_model(images_norm,True)
+            recon = gen_model(images)
+            # output of generated input
+            recon_norm = normalization(recon)
+            recon_labels,recon_features = app_model(recon_norm,True)
+            # output of original input
+            images_norm = normalization(images)
+            _,origin_features = app_model(images_norm,True)
 
-                reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-                label_loss = criterion_ce(recon_labels, targets)
-                # feat_loss = 0
-                # for origin_feat,recon_feat in zip(origin_features,recon_features):
-                #     feat_loss += criterion_mse(origin_feat,recon_feat)
-                loss = reg_loss + label_loss #0.17,0.93
+            reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
+            label_loss = criterion_ce(recon_labels, targets)
+            # feat_loss = 0
+            # for origin_feat,recon_feat in zip(origin_features,recon_features):
+            #     feat_loss += criterion_mse(origin_feat,recon_feat)
+            loss = reg_loss + label_loss #0.17,0.93
 
-                acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
-                top1.update(acc1[0], targets.shape[0])
-                top5.update(acc5[0], targets.shape[0])
-                test_iter.set_description(
-                    f" Test: {epoch:3}. "
-                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
-                    # f"reg: {reg_loss.cpu().item():.3f}. "
-                    # f"fea: {feat_loss.cpu().item():.3f}. "
-                    # f"lab: {label_loss.cpu().item():.3f}. "
-                    )
+            acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
+            top1.update(acc1[0], targets.shape[0])
+            top5.update(acc5[0], targets.shape[0])
+            test_iter.set_description(
+                f" Test: {epoch:3}. "
+                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. "
+                # f"reg: {reg_loss.cpu().item():.3f}. "
+                # f"fea: {feat_loss.cpu().item():.3f}. "
+                # f"lab: {label_loss.cpu().item():.3f}. "
+                )
 
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
