@@ -339,7 +339,7 @@ def check_accuracy(images,targets,model):
 
 def deepcod_main(param,datarange):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights, Discriminator, compute_gradient_penalty
-    sim_train = Simulator(train=False)
+    sim_train = Simulator(train=True)
     sim_test = Simulator(train=False,usemodel=False)
 
     # data
