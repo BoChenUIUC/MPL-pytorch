@@ -162,22 +162,6 @@ class Resblock_up(nn.Module):
 		x_init = self.deconv_skip(F.relu(self.bn3(x_init)))
 		return x + x_init
 
-class ComplexEncoder(nn.Module):
-
-	def __init__(self, channels):
-		super(ComplexEncoder, self).__init__()
-		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv1 = nn.Conv2d(3, channels, kernel_size=3, stride=2, padding=1, bias=True)
-
-		self.bn2 = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, stride=2, padding=1, bias=True)
-
-	def forward(self, x):
-		x = self.conv1(F.relu(self.bn1(x)))
-		x = self.conv2(F.relu(self.bn2(x)))
-
-		return x
-
 class LightweightEncoder(nn.Module):
 
 	def __init__(self, channels, kernel_size=4, num_centers=8):
