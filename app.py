@@ -403,7 +403,7 @@ def deepcod_main(param,datarange):
             #     loss0 += criterion_mse(origin_feat,recon_feat)
             # loss_g = loss0 #- torch.mean(fake_validity)
             
-            if epoch%10==0:
+            if epoch%10!=0:
                 loss_g.backward()
                 optimizer_g.step()
             # for p in discriminator.parameters():
