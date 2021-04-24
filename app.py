@@ -398,9 +398,9 @@ def deepcod_main(param,datarange):
             # fake_validity = discriminator(norm_recon)
 
             loss0 = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-            loss0 += criterion_ce(recon_labels, targets)
-            # for origin_feat,recon_feat in zip(origin_features,recon_features):
-            #     loss0 += criterion_mse(origin_feat,recon_feat)
+            # loss0 += criterion_ce(recon_labels, targets)
+            for origin_feat,recon_feat in zip(origin_features,recon_features):
+                loss0 += criterion_mse(origin_feat,recon_feat)
             loss_g = loss0 #- torch.mean(fake_validity)
                     
             loss_g.backward()
@@ -459,11 +459,11 @@ def deepcod_main(param,datarange):
                 _,origin_features = app_model(images_norm,True)
 
                 reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-                label_loss = criterion_ce(recon_labels, targets)
-                # feat_loss = 0
-                # for origin_feat,recon_feat in zip(origin_features,recon_features):
-                #     feat_loss += criterion_mse(origin_feat,recon_feat)
-                loss = reg_loss + label_loss #0.17,0.93
+                # label_loss = criterion_ce(recon_labels, targets)
+                feat_loss = 0
+                for origin_feat,recon_feat in zip(origin_features,recon_features):
+                    feat_loss += criterion_mse(origin_feat,recon_feat)
+                loss = reg_loss + feat_loss #0.17,0.93
 
                 acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
                 top1.update(acc1[0], targets.shape[0])
