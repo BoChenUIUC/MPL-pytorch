@@ -213,7 +213,6 @@ class DeepCOD(nn.Module):
 	def __init__(self, kernel_size=4, num_centers=8):
 		super(DeepCOD, self).__init__()
 		out_size = 3
-		no_of_hidden_units = 64
 		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=8)
 		self.attention_1 = Attention(out_size,no_of_hidden_units)
 		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
