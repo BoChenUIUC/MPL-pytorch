@@ -360,16 +360,16 @@ def deepcod_main(param,datarange):
         gen_model = gen_model.cuda()
 
     # discriminator
-    lambda_gp = 10
-    discriminator = Discriminator()
-    if args.device != 'cpu':
-        discriminator = discriminator.cuda()
+    # lambda_gp = 10
+    # discriminator = Discriminator()
+    # if args.device != 'cpu':
+    #     discriminator = discriminator.cuda()
 
     criterion_ce = nn.CrossEntropyLoss()
     criterion_mse = nn.MSELoss()
     # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
-    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
+    # optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
 
@@ -380,8 +380,8 @@ def deepcod_main(param,datarange):
         top1 = AverageMeter()
         top5 = AverageMeter()
         gen_model.train()
-        discriminator.train()
-        train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
+        # discriminator.train()
+        train_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
                 images = images.cuda()
