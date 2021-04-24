@@ -381,7 +381,7 @@ def deepcod_main(param,datarange):
         top5 = AverageMeter()
         gen_model.train()
         # discriminator.train()
-        train_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
+        train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
                 images = images.cuda()
@@ -441,7 +441,7 @@ def deepcod_main(param,datarange):
         # if epoch%5!=0:continue
         top1 = AverageMeter()
         top5 = AverageMeter()
-        gen_model.eval()
+        # gen_model.eval()
         test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
         with torch.no_grad():
             for step, (images, targets) in enumerate(test_iter):
