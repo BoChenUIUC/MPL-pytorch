@@ -468,7 +468,7 @@ def deepcod_main(param,datarange):
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
         with open('training.log','a') as f:
-            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.cpu().item():.3f}. \n")
+            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss_g.cpu().item():.3f}. \n")
 
 
 def disturb_exp(args, train_loader, model, param, datarange=None):
