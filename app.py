@@ -353,7 +353,8 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod.pth'
+    PATH = 'backup/deepcod_simple.pth'
+    max_acc = 0
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
     # gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
@@ -471,10 +472,12 @@ def deepcod_main(param,datarange):
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. "
                 )
 
-        # test_iter.close()
-        # torch.save(gen_model.state_dict(), PATH)
-        # with open('training.log','a') as f:
-        #     f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. \n")
+        test_iter.close()
+        if top5.avg > max_acc:
+            torch.save(gen_model.state_dict(), PATH)
+            max_acc = top5.avg
+        with open('training.log','a') as f:
+            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. \n")
 
 
 def disturb_exp(args, train_loader, model, param, datarange=None):

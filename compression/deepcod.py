@@ -257,6 +257,7 @@ class DeepCOD(nn.Module):
 		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
 		self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
 		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
+		self.resblock_up3 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
@@ -268,6 +269,7 @@ class DeepCOD(nn.Module):
 		x = self.resblock_up1(x)
 		x = self.attention_2(x)
 		x = self.resblock_up2(x)
+		x = self.resblock_up3(x)
 		x = self.output_conv(x)
 		
 		return x
