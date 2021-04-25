@@ -253,30 +253,41 @@ class DeepCOD(nn.Module):
 		super(DeepCOD, self).__init__()
 		out_size = 3
 		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=8)
-		self.attention_1 = Attention(out_size,no_of_hidden_units)
-		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
-		self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
-		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
-		self.conv1 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+		# version 1
+		# self.attention_1 = Attention(out_size,no_of_hidden_units)
+		# self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
+		# self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
+		# self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
+		# self.conv1 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+		# self.conv1 = spectral_norm(self.conv1)
+		# self.bn1 = nn.BatchNorm2d(no_of_hidden_units)
+		# self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+		# self.conv2 = spectral_norm(self.conv2)
+		# self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
+		# self.output_conv = Output_conv(no_of_hidden_units)
+		# version 2
+		self.conv1 = nn.Conv2d(out_size, no_of_hidden_units, 3, stride=1, padding=1)
 		self.conv1 = spectral_norm(self.conv1)
-		self.bn1 = nn.BatchNorm2d(no_of_hidden_units)
-		self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-		self.conv2 = spectral_norm(self.conv2)
-		self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
-		self.output_conv = Output_conv(no_of_hidden_units)
+		self.bn1 = nn.BatchNorm2d(out_size)
+		self.gen = Generator()
 		
 
 	def forward(self, x): 
 		x = self.encoder(x)
 
 		# reconstruct
-		x = self.attention_1(x)
-		x = self.resblock_up1(x)
-		x = self.attention_2(x)
-		x = self.resblock_up2(x)
+		# x = self.attention_1(x)
+		# x = self.resblock_up1(x)
+		# x = self.attention_2(x)
+		# x = self.resblock_up2(x)
+		# x = self.conv1(F.relu(self.bn1(x)))
+		# x = self.conv2(F.relu(self.bn2(x)))
+		# x = self.output_conv(x)
+
+		# generator
 		x = self.conv1(F.relu(self.bn1(x)))
-		x = self.conv2(F.relu(self.bn2(x)))
-		x = self.output_conv(x)
+		x = self.gen(x)
+
 		
 		return x
 
