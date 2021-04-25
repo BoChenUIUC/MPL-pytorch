@@ -258,11 +258,11 @@ class DeepCOD(nn.Module):
 		self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
 		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
 		self.conv1 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-        self.conv1 = spectral_norm(self.conv1)
-        self.bn1 = nn.BatchNorm2d(no_of_hidden_units)
-        self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-        self.conv2 = spectral_norm(self.conv2)
-        self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
+		self.conv1 = spectral_norm(self.conv1)
+		self.bn1 = nn.BatchNorm2d(no_of_hidden_units)
+		self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+		self.conv2 = spectral_norm(self.conv2)
+		self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
