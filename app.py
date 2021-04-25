@@ -119,13 +119,13 @@ def evaluate(args, test_loader, model, criterion):
         test_iter.close()
         return losses.avg, top1.avg, top5.avg
 
-def get_dataloader(args,train=True,shuffle=False):
+def get_dataloader(args,train=True):
     transform_val = transforms.Compose([
         transforms.ToTensor(),
     ])
     test_dataset = datasets.CIFAR10(args.data_path, train=train, 
                                     transform=transform_val, download=False)
-    sampler = SequentialSampler(test_dataset) if shuffle==False else RandomSampler(test_dataset)
+    sampler = SequentialSampler(test_dataset) if train==True else RandomSampler(test_dataset)
     test_loader = DataLoader(test_dataset,
                              sampler=sampler,
                              batch_size=args.batch_size,
@@ -341,7 +341,7 @@ def check_accuracy(images,targets,model):
 def deepcod_main(param,datarange):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights, Discriminator, compute_gradient_penalty
     sim_train = Simulator(train=True)
-    sim_test = Simulator(train=False,usemodel=False,shuffle=True)
+    sim_test = Simulator(train=False,usemodel=False)
 
     # data
     train_loader = sim_train.dataloader
@@ -383,7 +383,7 @@ def deepcod_main(param,datarange):
         loss = AverageMeter()
         gen_model.train()
         # discriminator.train()
-        train_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
+        train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
                 images = images.cuda()
@@ -392,8 +392,7 @@ def deepcod_main(param,datarange):
             # generator update
             # for p in discriminator.parameters():
             #     p.requires_grad_(False)
-            if epoch%2!=0:
-                optimizer_g.zero_grad()
+            optimizer_g.zero_grad()
             recon = gen_model(images)
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
@@ -405,9 +404,8 @@ def deepcod_main(param,datarange):
             #     loss0 += criterion_mse(origin_feat,recon_feat)
             # loss_g = loss0 #- torch.mean(fake_validity)
             
-            if epoch%2!=0:
-                loss_g.backward()
-                optimizer_g.step()
+            loss_g.backward()
+            optimizer_g.step()
             # for p in discriminator.parameters():
             #     p.requires_grad_(True)
 
@@ -442,34 +440,34 @@ def deepcod_main(param,datarange):
         train_iter.close()
 
         # testing
-        # if epoch%5!=0:continue
-        # top1 = AverageMeter()
-        # top5 = AverageMeter()
-        # loss = AverageMeter()
-        # # gen_model.eval()
-        # test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
-        # for step, (images, targets) in enumerate(test_iter):
-        #     if args.device != 'cpu':
-        #         images = images.cuda()
-        #         targets = targets.cuda()
+        if epoch%5!=0:continue
+        top1 = AverageMeter()
+        top5 = AverageMeter()
+        loss = AverageMeter()
+        # gen_model.eval()
+        test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
+        for step, (images, targets) in enumerate(test_iter):
+            if args.device != 'cpu':
+                images = images.cuda()
+                targets = targets.cuda()
 
-        #     # generator update
-        #     recon = gen_model(images)
-        #     recon_labels,recon_features = app_model(normalization(recon),True)
-        #     _,origin_features = app_model(normalization(images),True)
+            # generator update
+            recon = gen_model(images)
+            recon_labels,recon_features = app_model(normalization(recon),True)
+            _,origin_features = app_model(normalization(images),True)
 
-        #     loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-        #     loss_g += criterion_ce(recon_labels, targets)
+            loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
+            loss_g += criterion_ce(recon_labels, targets)
 
 
-        #     loss.update(loss_g.cpu().item())
-        #     acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
-        #     top1.update(acc1[0], targets.shape[0])
-        #     top5.update(acc5[0], targets.shape[0])
-        #     test_iter.set_description(
-        #         f" Test: {epoch:3}. "
-        #         f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. "
-        #         )
+            loss.update(loss_g.cpu().item())
+            acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
+            top1.update(acc1[0], targets.shape[0])
+            top5.update(acc5[0], targets.shape[0])
+            test_iter.set_description(
+                f" Test: {epoch:3}. "
+                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. "
+                )
 
         # test_iter.close()
         # torch.save(gen_model.state_dict(), PATH)
@@ -750,12 +748,12 @@ def disturb_test(args, train_loader, model, cnn_filter, datarange=None):
     test_iter.close()
 
 class Simulator:
-    def __init__(self,train=True,usemodel=True,shuffle=False):
+    def __init__(self,train=True,usemodel=True):
         self.opt = setup_opt()
         self.opt.resume = './checkpoint/cifar10-4K.5_best.pth.tar'
         if usemodel:
             self.model = get_model(self.opt)
-        self.dataloader = get_dataloader(self.opt,train=train,shuffle=shuffle)
+        self.dataloader = get_dataloader(self.opt,train=train)
         self.num_batches = len(self.dataloader)
 
     def get_one_point(self, datarange, TF=None, C_param=None):
