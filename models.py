@@ -134,11 +134,11 @@ class WideResNet(nn.Module):
         features = []
         # if extract_features:features.append(x)
         out = self.conv1(x)
-        # if extract_features:features.append(out)
+        if extract_features:features.append(out)
         out = self.block1(out)
         if extract_features:features.append(out)
         out = self.block2(out)
-        if extract_features:features.append(out)
+        # if extract_features:features.append(out)
         out = self.block3(out)
         # if extract_features:features.append(out)
         out = self.relu(self.bn1(out))
