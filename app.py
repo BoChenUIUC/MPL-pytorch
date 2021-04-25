@@ -494,6 +494,9 @@ def deepcod_validate():
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
 
+    # print(gen_model.encoder.centers)
+    # exit(0)
+
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
     top1 = AverageMeter()

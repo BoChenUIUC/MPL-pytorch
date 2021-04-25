@@ -221,7 +221,8 @@ class LightweightEncoder(nn.Module):
 		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
 		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
 		# dont know how to use hardout, use this temporarily
-		x = softout
+		# x = softout
+		x = hardout
 
 		return x
 
