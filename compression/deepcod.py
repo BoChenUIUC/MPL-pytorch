@@ -278,12 +278,12 @@ class DeepCOD(nn.Module):
 		# reconstruct
 		x = self.attention_1(x)
 		x = self.resblock_up1(x)
-		x = self.conv1(F.relu(self.bn1(x)))
-		x = self.conv2(F.relu(self.bn2(x)))
+		# x = self.conv1(F.relu(self.bn1(x)))
+		# x = self.conv2(F.relu(self.bn2(x)))
 		x = self.attention_2(x)
 		x = self.resblock_up2(x)
-		x = self.conv3(F.relu(self.bn3(x)))
-		x = self.conv4(F.relu(self.bn4(x)))
+		# x = self.conv3(F.relu(self.bn3(x)))
+		# x = self.conv4(F.relu(self.bn4(x)))
 		x = self.output_conv(x)
 		
 		return x

@@ -353,7 +353,7 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_simple.pth'
+    PATH = 'backup/deepcod_m1.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
@@ -374,9 +374,6 @@ def deepcod_main(param,datarange):
     # optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
-
-    with open('training.log','a') as f:
-        f.write('-----------start---------\n')
     for epoch in range(1,1001):
         # training
         top1 = AverageMeter()
@@ -476,9 +473,7 @@ def deepcod_main(param,datarange):
         if top5.avg > max_acc:
             torch.save(gen_model.state_dict(), PATH)
             max_acc = top5.avg
-        with open('training.log','a') as f:
-            f.write(f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. \n")
-
+        
 
 def disturb_exp(args, train_loader, model, param, datarange=None):
     from compression.transformer import Transformer
