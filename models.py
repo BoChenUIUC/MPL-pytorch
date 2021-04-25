@@ -138,17 +138,14 @@ class WideResNet(nn.Module):
         out = self.block1(out)
         if extract_features:features.append(out)
         out = self.block2(out)
-        if extract_features:features.append(out)
+        # if extract_features:features.append(out)
         out = self.block3(out)
-        if extract_features:features.append(out)
+        # if extract_features:features.append(out)
         out = self.relu(self.bn1(out))
         out = F.adaptive_avg_pool2d(out, 1)
         out = out.view(-1, self.channels)
         if extract_features:
-            features.append(out)
-            out = self.fc(self.drop(out))
-            features.append(out)
-            return out, features
+            return self.fc(self.drop(out)), features
         return self.fc(self.drop(out))
 
 
