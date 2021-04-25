@@ -353,11 +353,11 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod.pth'
+    PATH = 'backup/deepcod_simple.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
-    # gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
+    gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
 
@@ -470,6 +470,7 @@ def deepcod_main(param,datarange):
                 )
 
         test_iter.close()
+        break
         if top5.avg > max_acc:
             torch.save(gen_model.state_dict(), PATH)
             max_acc = top5.avg
