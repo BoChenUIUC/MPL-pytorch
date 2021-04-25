@@ -353,7 +353,7 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_hard_c8_simple.pth'
+    PATH = 'backup/deepcod_soft_c64.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
@@ -494,8 +494,8 @@ def deepcod_validate():
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
 
-    print(gen_model.encoder.centers.data)
-    exit(0)
+    # print(gen_model.encoder.centers.data)
+    # exit(0)
 
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 

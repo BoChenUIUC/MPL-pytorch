@@ -258,10 +258,10 @@ def init_weights(m):
 
 class DeepCOD(nn.Module):
 
-	def __init__(self, kernel_size=4, num_centers=8):
+	def __init__(self, kernel_size=4, num_centers=64):
 		super(DeepCOD, self).__init__()
 		out_size = 3
-		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=8)
+		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=num_centers)
 		self.attention_1 = Attention(out_size,no_of_hidden_units)
 		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
 		self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
