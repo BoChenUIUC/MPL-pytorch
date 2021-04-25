@@ -487,15 +487,15 @@ def deepcod_validate():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_simple.pth'
+    PATH = 'backup/deepcod_hard.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
 
-    print(gen_model.encoder.centers.data)
-    exit(0)
+    # print(gen_model.encoder.centers.data)
+    # exit(0)
 
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 

@@ -203,7 +203,7 @@ class Resblock_up(nn.Module):
 
 class LightweightEncoder(nn.Module):
 
-	def __init__(self, channels, kernel_size=4, num_centers=8):
+	def __init__(self, channels, kernel_size=4, num_centers=64):
 		super(LightweightEncoder, self).__init__()
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
@@ -266,12 +266,12 @@ class DeepCOD(nn.Module):
 		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
 		self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
 		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
-		# self.conv1 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-		# self.conv1 = spectral_norm(self.conv1)
-		# self.bn1 = nn.BatchNorm2d(no_of_hidden_units)
-		# self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-		# self.conv2 = spectral_norm(self.conv2)
-		# self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
+		self.conv1 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+		self.conv1 = spectral_norm(self.conv1)
+		self.bn1 = nn.BatchNorm2d(no_of_hidden_units)
+		self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+		self.conv2 = spectral_norm(self.conv2)
+		self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
@@ -283,8 +283,8 @@ class DeepCOD(nn.Module):
 		x = self.resblock_up1(x)
 		x = self.attention_2(x)
 		x = self.resblock_up2(x)
-		# x = self.conv1(F.relu(self.bn1(x)))
-		# x = self.conv2(F.relu(self.bn2(x)))
+		x = self.conv1(F.relu(self.bn1(x)))
+		x = self.conv2(F.relu(self.bn2(x)))
 		x = self.output_conv(x)
 		
 		return x
