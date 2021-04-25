@@ -119,7 +119,7 @@ def evaluate(args, test_loader, model, criterion):
         test_iter.close()
         return losses.avg, top1.avg, top5.avg
 
-def get_dataloader(args,train=True):
+def get_dataloader(args,train=True,shuffle=False):
     transform_val = transforms.Compose([
         transforms.ToTensor(),
     ])
@@ -128,6 +128,7 @@ def get_dataloader(args,train=True):
     test_loader = DataLoader(test_dataset,
                              sampler=SequentialSampler(test_dataset),
                              batch_size=args.batch_size,
+                             shuffle=shuffle,
                              num_workers=args.workers)
     return test_loader
 
@@ -340,7 +341,7 @@ def check_accuracy(images,targets,model):
 def deepcod_main(param,datarange):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights, Discriminator, compute_gradient_penalty
     sim_train = Simulator(train=True)
-    sim_test = Simulator(train=False,usemodel=False)
+    sim_test = Simulator(train=False,usemodel=False,shuffle=True)
 
     # data
     train_loader = sim_train.dataloader
@@ -391,7 +392,8 @@ def deepcod_main(param,datarange):
             # generator update
             # for p in discriminator.parameters():
             #     p.requires_grad_(False)
-            optimizer_g.zero_grad()
+            if epoch%2!=0:
+                optimizer_g.zero_grad()
             recon = gen_model(images)
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
@@ -403,7 +405,7 @@ def deepcod_main(param,datarange):
             #     loss0 += criterion_mse(origin_feat,recon_feat)
             # loss_g = loss0 #- torch.mean(fake_validity)
             
-            if epoch%10!=0:
+            if epoch%2!=0:
                 loss_g.backward()
                 optimizer_g.step()
             # for p in discriminator.parameters():
@@ -748,12 +750,12 @@ def disturb_test(args, train_loader, model, cnn_filter, datarange=None):
     test_iter.close()
 
 class Simulator:
-    def __init__(self,train=True,usemodel=True):
+    def __init__(self,train=True,usemodel=True,shuffle=False):
         self.opt = setup_opt()
         self.opt.resume = './checkpoint/cifar10-4K.5_best.pth.tar'
         if usemodel:
             self.model = get_model(self.opt)
-        self.dataloader = get_dataloader(self.opt,train=train)
+        self.dataloader = get_dataloader(self.opt,train=train,shuffle=shuffle)
         self.num_batches = len(self.dataloader)
 
     def get_one_point(self, datarange, TF=None, C_param=None):
