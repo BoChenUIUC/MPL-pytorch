@@ -375,70 +375,70 @@ def deepcod_main(param,datarange):
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
     for epoch in range(1,1001):
-        # training
-        top1 = AverageMeter()
-        top5 = AverageMeter()
-        loss = AverageMeter()
-        gen_model.train()
-        # discriminator.train()
-        train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-        for step, (images, targets) in enumerate(train_iter):
-            if args.device != 'cpu':
-                images = images.cuda()
-                targets = targets.cuda()
+        # # training
+        # top1 = AverageMeter()
+        # top5 = AverageMeter()
+        # loss = AverageMeter()
+        # gen_model.train()
+        # # discriminator.train()
+        # train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
+        # for step, (images, targets) in enumerate(train_iter):
+        #     if args.device != 'cpu':
+        #         images = images.cuda()
+        #         targets = targets.cuda()
 
-            # generator update
-            # for p in discriminator.parameters():
-            #     p.requires_grad_(False)
-            optimizer_g.zero_grad()
-            recon = gen_model(images)
-            recon_labels,recon_features = app_model(normalization(recon),True)
-            _,origin_features = app_model(normalization(images),True)
-            # fake_validity = discriminator(norm_recon)
+        #     # generator update
+        #     # for p in discriminator.parameters():
+        #     #     p.requires_grad_(False)
+        #     optimizer_g.zero_grad()
+        #     recon = gen_model(images)
+        #     recon_labels,recon_features = app_model(normalization(recon),True)
+        #     _,origin_features = app_model(normalization(images),True)
+        #     # fake_validity = discriminator(norm_recon)
 
-            loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-            # loss_g += criterion_ce(recon_labels, targets)
-            for origin_feat,recon_feat in zip(origin_features,recon_features):
-                loss_g += criterion_mse(origin_feat,recon_feat)
-            # loss_g = loss0 #- torch.mean(fake_validity)
+        #     loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
+        #     # loss_g += criterion_ce(recon_labels, targets)
+        #     for origin_feat,recon_feat in zip(origin_features,recon_features):
+        #         loss_g += criterion_mse(origin_feat,recon_feat)
+        #     # loss_g = loss0 #- torch.mean(fake_validity)
             
-            loss_g.backward()
-            optimizer_g.step()
-            # for p in discriminator.parameters():
-            #     p.requires_grad_(True)
+        #     loss_g.backward()
+        #     optimizer_g.step()
+        #     # for p in discriminator.parameters():
+        #     #     p.requires_grad_(True)
 
-            # # discriminator update
-            # optimizer_d.zero_grad()
-            # # Real images
-            # real_imgs = normalization(images)
-            # real_validity = discriminator(real_imgs)
-            # # Fake images
-            # recon = gen_model(images)
-            # fake_imgs = normalization(recon)
-            # fake_validity = discriminator(fake_imgs)
-            # # Gradient penalty
-            # gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data, args.device != 'cpu')
-            # # Adversarial loss
-            # loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
+        #     # # discriminator update
+        #     # optimizer_d.zero_grad()
+        #     # # Real images
+        #     # real_imgs = normalization(images)
+        #     # real_validity = discriminator(real_imgs)
+        #     # # Fake images
+        #     # recon = gen_model(images)
+        #     # fake_imgs = normalization(recon)
+        #     # fake_validity = discriminator(fake_imgs)
+        #     # # Gradient penalty
+        #     # gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data, args.device != 'cpu')
+        #     # # Adversarial loss
+        #     # loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
 
-            # loss_d.backward()
-            # optimizer_d.step()
+        #     # loss_d.backward()
+        #     # optimizer_d.step()
             
-            loss.update(loss_g.cpu().item())
-            acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
-            top1.update(acc1[0], targets.shape[0])
-            top5.update(acc5[0], targets.shape[0])
-            train_iter.set_description(
-                f"Train: {epoch:3}. "
-                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. "
-                # f"loss_d: {loss_d.cpu().item():.3f}. "
-                # f"loss0: {loss0.cpu().item():.3f}. "
-                )
+        #     loss.update(loss_g.cpu().item())
+        #     acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
+        #     top1.update(acc1[0], targets.shape[0])
+        #     top5.update(acc5[0], targets.shape[0])
+        #     train_iter.set_description(
+        #         f"Train: {epoch:3}. "
+        #         f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. "
+        #         # f"loss_d: {loss_d.cpu().item():.3f}. "
+        #         # f"loss0: {loss0.cpu().item():.3f}. "
+        #         )
 
-        train_iter.close()
+        # train_iter.close()
 
-        # testing
-        if epoch%5!=0:continue
+        # # testing
+        # if epoch%5!=0:continue
         top1 = AverageMeter()
         top5 = AverageMeter()
         loss = AverageMeter()
