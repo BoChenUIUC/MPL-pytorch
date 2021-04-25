@@ -132,7 +132,7 @@ class WideResNet(nn.Module):
 
     def forward(self, x, extract_features=False):
         features = []
-        if extract_features:features.append(x)
+        # if extract_features:features.append(x)
         out = self.conv1(x)
         if extract_features:features.append(out)
         out = self.block1(out)
