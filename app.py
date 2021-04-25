@@ -353,7 +353,7 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod.pth'
+    PATH = 'backup/deepcod_hard.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.apply(init_weights)

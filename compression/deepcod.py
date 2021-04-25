@@ -203,7 +203,7 @@ class Resblock_up(nn.Module):
 
 class LightweightEncoder(nn.Module):
 
-	def __init__(self, channels, kernel_size=4, num_centers=8):
+	def __init__(self, channels, kernel_size=4, num_centers=64):
 		super(LightweightEncoder, self).__init__()
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
