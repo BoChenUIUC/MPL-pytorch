@@ -132,7 +132,7 @@ class WideResNet(nn.Module):
 
     def forward(self, x, extract_features=False):
         features = []
-        # if extract_features:features.append(x)
+        if extract_features:features.append(x)
         out = self.conv1(x)
         if extract_features:features.append(out)
         out = self.block1(out)
@@ -144,6 +144,7 @@ class WideResNet(nn.Module):
         out = self.relu(self.bn1(out))
         out = F.adaptive_avg_pool2d(out, 1)
         out = out.view(-1, self.channels)
+        if extract_features:features.append(out)
         if extract_features:
             return self.fc(self.drop(out)), features
         return self.fc(self.drop(out))
