@@ -125,10 +125,10 @@ def get_dataloader(args,train=True,shuffle=False):
     ])
     test_dataset = datasets.CIFAR10(args.data_path, train=train, 
                                     transform=transform_val, download=False)
+    sampler = SequentialSampler(test_dataset) if shuffle==False else RandomSampler(test_dataset)
     test_loader = DataLoader(test_dataset,
-                             sampler=SequentialSampler(test_dataset),
+                             sampler=sampler,
                              batch_size=args.batch_size,
-                             shuffle=shuffle,
                              num_workers=args.workers)
     return test_loader
 
