@@ -203,7 +203,7 @@ class Resblock_up(nn.Module):
 
 class LightweightEncoder(nn.Module):
 
-	def __init__(self, channels, kernel_size=4, num_centers=64):
+	def __init__(self, channels, kernel_size=4, num_centers=8):
 		super(LightweightEncoder, self).__init__()
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
@@ -217,14 +217,14 @@ class LightweightEncoder(nn.Module):
 		# each value has a varied number of centers
 
 		# quantization
-		# xsize = list(x.size())
-		# x = x.view(*(xsize + [1]))
-		# quant_dist = torch.pow(x-self.centers, 2)
-		# softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
-		# maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
-		# hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
-		# # dont know how to use hardout, use this temporarily
-		# x = softout
+		xsize = list(x.size())
+		x = x.view(*(xsize + [1]))
+		quant_dist = torch.pow(x-self.centers, 2)
+		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
+		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
+		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
+		# dont know how to use hardout, use this temporarily
+		x = softout
 
 		# huffman coding
 
