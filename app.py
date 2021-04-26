@@ -353,7 +353,7 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_hard_c64.pth'
+    PATH = 'backup/deepcod_soft_c64.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
@@ -487,7 +487,7 @@ def deepcod_validate():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod.pth'
+    PATH = 'backup/deepcod_soft_c64.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
