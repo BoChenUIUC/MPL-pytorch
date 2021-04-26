@@ -208,13 +208,12 @@ class LightweightEncoder(nn.Module):
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
 		self.centers = torch.nn.Parameter(torch.rand(num_centers))
+		self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
 	def forward(self, x):
 		# sample from input
 		x = self.sample(x)
-
-		# need a way to do adaptive quantization
-		# each value has a varied number of centers
 
 		# quantization
 		xsize = list(x.size())
@@ -226,11 +225,33 @@ class LightweightEncoder(nn.Module):
 		# dont know how to use hardout, use this temporarily
 		x = softout
 
+		# subsampling
+		B,C,H,W = x.size()
+		assert(H%2==0 and W%2==0)
+		# need a subsample map: B,C,H/2,W/2
+		# each entry is a value from 0 to 1
+		# we will use a NN to compute the map
+		# but the thresh will be learnt offline
+		ss_map = torch.rand(B,C,H//2,W//2)
+		# need a threshold deciding whether to filter
+		ss_thresh = 0
+		ss_bool = self.unpool(ss_map)>ss_thresh
+		pooled = self.pool(x)
+		unpooled = self.unpool(pooled)
+		x[ss_bool] = unpooled[ss_bool]
+		# print(x.view(B,C,-1))
+		# print(unpooled)
+
+
+		# calculate size after compression
+		# need to convert it into a 1-D vector
 		# huffman coding
 
 		# running length coding
 
 		# calculate resulted size
+
+		# upsampling
 
 		return x
 
