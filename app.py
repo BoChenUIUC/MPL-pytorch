@@ -125,7 +125,7 @@ def get_dataloader(args,train=True):
     ])
     test_dataset = datasets.CIFAR10(args.data_path, train=train, 
                                     transform=transform_val, download=False)
-    sampler = SequentialSampler(test_dataset) if train==True else RandomSampler(test_dataset)
+    sampler = SequentialSampler(test_dataset)# if train==True else RandomSampler(test_dataset)
     test_loader = DataLoader(test_dataset,
                              sampler=sampler,
                              batch_size=args.batch_size,
@@ -353,7 +353,7 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/deepcod_hard_disc_c8.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
@@ -362,16 +362,16 @@ def deepcod_main(param,datarange):
         gen_model = gen_model.cuda()
 
     # discriminator
-    # lambda_gp = 10
-    # discriminator = Discriminator()
-    # if args.device != 'cpu':
-    #     discriminator = discriminator.cuda()
+    lambda_gp = 10
+    discriminator = Discriminator()
+    if args.device != 'cpu':
+        discriminator = discriminator.cuda()
 
     criterion_ce = nn.CrossEntropyLoss()
     criterion_mse = nn.MSELoss()
     # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
-    # optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
+    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
     for epoch in range(1,1001):
@@ -388,41 +388,41 @@ def deepcod_main(param,datarange):
                 targets = targets.cuda()
 
             # generator update
-            # for p in discriminator.parameters():
-            #     p.requires_grad_(False)
+            for p in discriminator.parameters():
+                p.requires_grad_(False)
             optimizer_g.zero_grad()
             recon = gen_model(images)
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
-            # fake_validity = discriminator(norm_recon)
+            fake_validity = discriminator(normalization(images))
 
             loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
             # loss_g += criterion_ce(recon_labels, targets)
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
-            # loss_g = loss0 #- torch.mean(fake_validity)
+            loss_g -= torch.mean(fake_validity)
             
             loss_g.backward()
             optimizer_g.step()
-            # for p in discriminator.parameters():
-            #     p.requires_grad_(True)
+            for p in discriminator.parameters():
+                p.requires_grad_(True)
 
-            # # discriminator update
-            # optimizer_d.zero_grad()
-            # # Real images
-            # real_imgs = normalization(images)
-            # real_validity = discriminator(real_imgs)
-            # # Fake images
-            # recon = gen_model(images)
-            # fake_imgs = normalization(recon)
-            # fake_validity = discriminator(fake_imgs)
-            # # Gradient penalty
-            # gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data, args.device != 'cpu')
-            # # Adversarial loss
-            # loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
+            # discriminator update
+            optimizer_d.zero_grad()
+            # Real images
+            real_imgs = normalization(images)
+            real_validity = discriminator(real_imgs)
+            # Fake images
+            recon = gen_model(images)
+            fake_imgs = normalization(recon)
+            fake_validity = discriminator(fake_imgs)
+            # Gradient penalty
+            gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data, args.device != 'cpu')
+            # Adversarial loss
+            loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
 
             # loss_d.backward()
-            # optimizer_d.step()
+            optimizer_d.step()
             
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
@@ -439,6 +439,7 @@ def deepcod_main(param,datarange):
 
         # testing
         if epoch%5!=0:continue
+        print('Save to', PATH)
         top1 = AverageMeter()
         top5 = AverageMeter()
         loss = AverageMeter()
@@ -510,7 +511,7 @@ def deepcod_validate():
 
         # generator update
         recon = gen_model(images)
-        recon_labels,recon_features = app_model(normalization(recon),True)
+        recon_labels = app_model(normalization(recon))
 
         acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
         top1.update(acc1[0], targets.shape[0])
@@ -521,76 +522,97 @@ def deepcod_validate():
 
     test_iter.close()
 
-def disturb_exp(args, train_loader, model, param, datarange=None):
-    from compression.transformer import Transformer
-    # ROI_TF = Transformer(name='ROI')
-    Qual_TF = Transformer(name='Quality')
-    running_top1 = AverageMeter()
-    Qual_TF.reset()
-    model.eval()
-    entropy = nn.CrossEntropyLoss()
-    toMacroBlock = nn.AvgPool2d(kernel_size=(8,16), stride=(8,16), padding=0, ceil_mode=True)
-    train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-    for step, (images, targets) in enumerate(train_iter):
-        if datarange is not None:
-            if step<datarange[0]:continue
-            elif step>=datarange[1]:break 
-        cache_images = images.clone()
-        normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-        images = normalization(images)
-        batch_size = targets.shape[0]
+def disturb_exp():
+    from compression.deepcod import DeepCOD, compute_gradient_penalty
+    sim = Simulator(train=False)
+
+    # data
+    test_loader = sim.dataloader
+    args = sim.opt
+
+    # discriminator
+    app_model = sim.model
+    app_model.eval()
+
+    # encoder+decoder
+    PATH = 'backup/deepcod_soft_c8.pth'
+    max_acc = 0
+    gen_model = DeepCOD()
+    gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
+    if args.device != 'cpu':
+        gen_model = gen_model.cuda()
+
+    # print(gen_model.encoder.centers.data)
+    # exit(0)
+
+    normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+
+    gen_model.eval()
+    test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
+    toMacroBlock = nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
+    criterion_ce = nn.CrossEntropyLoss()
+    impact_filename = 'impact.txt'
+    loss_filename = 'loss.txt'
+    for step, (images, targets) in enumerate(test_iter):
         if args.device != 'cpu':
             images = images.cuda()
             targets = targets.cuda()
+        if step == 10:break
 
+        B,C,H,W = images.size()
         # magics
         X = Variable(images,requires_grad=True) 
-        # raw = ((X+1)/2.).data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
-        # fig = plot(raw)
-        # plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
-        # plt.close(fig)
-        outputs = model(X)
-        loss = entropy(outputs, targets)
-        # loss = -outputs
+        # plot original images
+        raw = images.data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
+        fig = plot(raw)
+        plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
+        plt.close(fig)
+        # 
+        recon = gen_model(X)
+        recon_labels = app_model(normalization(recon))
+        loss = criterion_ce(recon_labels, targets)
         gradients = torch.autograd.grad(outputs=loss, inputs=X,
                                 grad_outputs=torch.ones(loss.size()),
                               create_graph=True, retain_graph=False, only_inputs=True)[0]
         impact = torch.norm(gradients.data, dim=1)
-        impact = toMacroBlock(impact)
-        impact = impact.view(impact.size(0),-1)
-        # plot
-        # samples = impact.view(impact.size(0),4,2).data.cpu().numpy()
+        impact = toMacroBlock(impact).view(B,-1)
+        # impact /= torch.max(impact, dim=1, keepdim=True)[0]
+        _, impact = torch.sort(impact, dim=-1)
+        # impact = F.softmax(impact.view(B,-1),dim=-1)
+        # samples = impact.view(B,H//8,W//8).data.cpu().numpy()
         # fig = plot(samples)
-        # plt.savefig(f'samples/max_class_{step:1}.png', bbox_inches='tight')
+        # plt.savefig(f'samples/impact_{step:1}.png', bbox_inches='tight')
         # plt.close(fig)
+        # save to file
+        impact = impact.view(-1).data.cpu().numpy()
+        with open(impact_filename, "a") as f:
+            np.savetxt(f, impact, fmt='%1.6f', newline="\n")
 
         # loss map
-        # C_params = torch.ones(impact.size())*0.4
-        # loss_map = torch.zeros(impact.size())
-        # for img_idx in range(64):
-        #     print(img_idx)
-        #     for pos in range(8):
-        #         C_params[img_idx][pos] = 0.5
-        #         Qual_TF.reset()
-        #         tf_imgs = None
-        #         for i,th_img in enumerate(cache_images):
-        #             np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
-        #             tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy())
-        #             tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
-        #             if tf_imgs is None:
-        #                 tf_imgs = tf_img
-        #             else:
-        #                 tf_imgs = torch.cat((tf_imgs,tf_img),0)
-        #         acc1,loss,pred = check_accuracy(tf_imgs,targets,model)
-        #         cr = Qual_TF.get_compression_ratio()
-        #         loss_map[img_idx,pos] = loss.cpu().item()
-        #         C_params[img_idx][pos] = 0.4
-        # loss_map /= torch.max(loss_map, dim=1, keepdim=True)[0]
-        # samples = loss_map.view(loss_map.size(0),4,2).data.cpu().numpy()
+        base_loss = loss.cpu().item()
+        assert(H%8==0 and W%8==0)
+        ss_map = torch.zeros(B,C,H//8,W//8)
+        loss_map = torch.zeros(B,H//8,W//8)
+        for b in range(B):
+            for h in range(H//8):
+                for w in range(W//8):
+                    ss_map[b,:,h,w] = 1
+                    recon = gen_model(images,ss_map)
+                    recon_labels = app_model(normalization(recon))
+                    loss = criterion_ce(recon_labels, targets)
+                    _, acc5 = accuracy(recon_labels, targets, (1, 5))
+                    loss_map[b,h,w] = loss.cpu().item() - base_loss
+                    ss_map[b,:,h,w] = 0
+        # samples = loss_map.data.cpu().numpy()
         # fig = plot(samples)
         # plt.savefig(f'samples/loss_map_{step:1}.png', bbox_inches='tight')
         # plt.close(fig)
 
+        # write to file
+        _, loss_map = torch.sort(loss_map.view(B,-1), dim=-1)
+        loss_map = loss_map.view(-1).data.cpu().numpy()
+        with open(loss_filename, "a") as f:
+            np.savetxt(f, loss_map, fmt='%1.6f', newline="\n")
 
         # observ = torch.zeros((64,8))
         # C_params = torch.ones(impact.size())*0.4
@@ -620,72 +642,34 @@ def disturb_exp(args, train_loader, model, param, datarange=None):
         #     print(row,detect[row],impact[row])
         # print(torch.max(detect,dim=1))
 
-        lower,upper,k = param+0.5
-        k = int(k*8)
-        k = max(k,0); k = min(k,7)
-        # impact driven
-        idx = torch.topk(impact,k,dim=1)[1]
-        C_params = torch.ones(impact.size())*lower
-        tf_imgs = None
-        for i,th_img in enumerate(cache_images):
-            np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
-            C_params[i,idx[i]] = float(upper)
-            tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy())
-            tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
-            if tf_imgs is None:
-                tf_imgs = tf_img
-            else:
-                tf_imgs = torch.cat((tf_imgs,tf_img),0)
-        images = tf_imgs
-        acc1,_,_ = check_accuracy(images,targets,model)
-        cr = Qual_TF.get_compression_ratio()
-        # print('Impact:',acc1,cr,loss.cpu().item())
-        running_top1.update(float(acc1))
-        train_iter.set_description(
-            f"Train Iter: {step+1:3}. Top1: {running_top1.avg:.3f} "
-            f"Compression Rate: {cr:.3f}. ")
-
-        # feature driven
-        # C_param = np.array([0,0,0,-0.1,0,-.3])
-        # ROI_TF.reset()
+        # lower,upper,k = param+0.5
+        # k = int(k*8)
+        # k = max(k,0); k = min(k,7)
+        # # impact driven
+        # idx = torch.topk(impact,k,dim=1)[1]
+        # C_params = torch.ones(impact.size())*lower
         # tf_imgs = None
         # for i,th_img in enumerate(cache_images):
         #     np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
-        #     tf_img = ROI_TF.transform(image=np_img, C_param=C_param)
+        #     C_params[i,idx[i]] = float(upper)
+        #     tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy())
         #     tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
         #     if tf_imgs is None:
         #         tf_imgs = tf_img
         #     else:
         #         tf_imgs = torch.cat((tf_imgs,tf_img),0)
         # images = tf_imgs
-        # acc1,loss,_ = check_accuracy(images,targets,model)
-        # cr = ROI_TF.get_compression_ratio()
-        # print('Feature:',acc1,cr,loss.cpu().item())
+        # acc1,_,_ = check_accuracy(images,targets,model)
+        # cr = Qual_TF.get_compression_ratio()
+        # # print('Impact:',acc1,cr,loss.cpu().item())
+        # running_top1.update(float(acc1))
+        # train_iter.set_description(
+        #     f"Train Iter: {step+1:3}. Top1: {running_top1.avg:.3f} "
+        #     f"Compression Rate: {cr:.3f}. ")
 
-        # jpeg
-        # print('------------JPEG--------------')
+        
 
-        # C_params = torch.ones(impact.size())
-        # for mul in range(1,11):
-        #     Qual_TF.reset()
-        #     tf_imgs = None
-        #     for i,th_img in enumerate(cache_images):
-        #         # print(i,C_params[i,:])
-        #         # print(impact[i,:])
-        #         np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
-        #         tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy()*mul/10.0)
-        #         tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
-        #         if tf_imgs is None:
-        #             tf_imgs = tf_img
-        #         else:
-        #             tf_imgs = torch.cat((tf_imgs,tf_img),0)
-        #     images = tf_imgs
-        #     acc1,loss,_ = check_accuracy(images,targets,model)
-        #     cr = Qual_TF.get_compression_ratio()
-        #     print('Metrics:',mul,acc1,cr,loss.cpu().item())
-
-    train_iter.close()
-    return running_top1.avg,Qual_TF.get_compression_ratio()
+    test_iter.close()
 
 def disturb_train(args, train_loader, model, cnn_filter, datarange=None):
     model.eval()

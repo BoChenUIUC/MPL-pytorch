@@ -208,10 +208,10 @@ class LightweightEncoder(nn.Module):
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
 		self.centers = torch.nn.Parameter(torch.rand(num_centers))
-		self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+		self.pool = nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
-	def forward(self, x):
+	def forward(self, x, ss_map=None):
 		# sample from input
 		x = self.sample(x)
 
@@ -222,8 +222,7 @@ class LightweightEncoder(nn.Module):
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
 		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
 		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
-		# dont know how to use hardout, use this temporarily
-		x = softout
+		x = hardout
 
 		# subsampling
 		# B,C,H,W = x.size()
@@ -232,15 +231,11 @@ class LightweightEncoder(nn.Module):
 		# # each entry is a value from 0 to 1
 		# # we will use a NN to compute the map
 		# # but the thresh will be learnt offline
-		# ss_map = torch.rand(B,C,H//2,W//2)
-		# # need a threshold deciding whether to filter
-		# ss_thresh = 0
-		# ss_bool = self.unpool(ss_map)>ss_thresh
-		# pooled = self.pool(x)
-		# unpooled = self.unpool(pooled)
-		# x[ss_bool] = unpooled[ss_bool]
-		# print(x.view(B,C,-1))
-		# print(unpooled)
+		# if ss_map is not None:
+		# 	ss_map = self.unpool(ss_map).type(torch.bool)
+		# 	pooled = self.pool(x)
+		# 	unpooled = self.unpool(pooled)
+		# 	x[ss_map] = unpooled[ss_map]
 
 
 		# calculate size after compression
@@ -296,8 +291,8 @@ class DeepCOD(nn.Module):
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
-	def forward(self, x): 
-		x = self.encoder(x)
+	def forward(self, x, ss_map=None): 
+		x = self.encoder(x,ss_map)
 
 		# reconstruct
 		x = self.attention_1(x)

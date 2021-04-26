@@ -582,9 +582,10 @@ def dual_train(net):
 		torch.save(net.state_dict(), PATH)
 
 def test():
-	from app import deepcod_main,deepcod_validate
-	# deepcod_main(np.array([-0.1,0,-0.3]),None)
-	deepcod_validate()
+	from app import deepcod_main,deepcod_validate,disturb_exp
+	deepcod_main(np.array([-0.1,0,-0.3]),None)
+	# deepcod_validate()
+	# disturb_exp()
 
 if __name__ == "__main__":
 	np.random.seed(123)
