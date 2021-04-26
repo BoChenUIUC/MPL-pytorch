@@ -217,14 +217,14 @@ class LightweightEncoder(nn.Module):
 		# each value has a varied number of centers
 
 		# quantization
-		xsize = list(x.size())
-		x = x.view(*(xsize + [1]))
-		quant_dist = torch.pow(x-self.centers, 2)
-		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
-		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
-		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
-		# dont know how to use hardout, use this temporarily
-		x = softout
+		# xsize = list(x.size())
+		# x = x.view(*(xsize + [1]))
+		# quant_dist = torch.pow(x-self.centers, 2)
+		# softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
+		# maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
+		# hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
+		# # dont know how to use hardout, use this temporarily
+		# x = softout
 
 		# huffman coding
 

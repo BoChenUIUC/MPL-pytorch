@@ -487,7 +487,7 @@ def deepcod_validate():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/deepcod_soft_c0.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
