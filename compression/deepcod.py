@@ -258,7 +258,7 @@ def init_weights(m):
 
 class DeepCOD(nn.Module):
 
-	def __init__(self, kernel_size=4, num_centers=64):
+	def __init__(self, kernel_size=4, num_centers=8):
 		super(DeepCOD, self).__init__()
 		out_size = 3
 		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=num_centers)
