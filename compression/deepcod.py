@@ -226,19 +226,19 @@ class LightweightEncoder(nn.Module):
 		x = softout
 
 		# subsampling
-		B,C,H,W = x.size()
-		assert(H%2==0 and W%2==0)
-		# need a subsample map: B,C,H/2,W/2
-		# each entry is a value from 0 to 1
-		# we will use a NN to compute the map
-		# but the thresh will be learnt offline
-		ss_map = torch.rand(B,C,H//2,W//2)
-		# need a threshold deciding whether to filter
-		ss_thresh = 0
-		ss_bool = self.unpool(ss_map)>ss_thresh
-		pooled = self.pool(x)
-		unpooled = self.unpool(pooled)
-		x[ss_bool] = unpooled[ss_bool]
+		# B,C,H,W = x.size()
+		# assert(H%2==0 and W%2==0)
+		# # need a subsample map: B,C,H/2,W/2
+		# # each entry is a value from 0 to 1
+		# # we will use a NN to compute the map
+		# # but the thresh will be learnt offline
+		# ss_map = torch.rand(B,C,H//2,W//2)
+		# # need a threshold deciding whether to filter
+		# ss_thresh = 0
+		# ss_bool = self.unpool(ss_map)>ss_thresh
+		# pooled = self.pool(x)
+		# unpooled = self.unpool(pooled)
+		# x[ss_bool] = unpooled[ss_bool]
 		# print(x.view(B,C,-1))
 		# print(unpooled)
 
