@@ -203,17 +203,29 @@ class Resblock_up(nn.Module):
 
 class LightweightEncoder(nn.Module):
 
-	def __init__(self, channels, kernel_size=4, num_centers=8):
+	def __init__(self, channels, kernel_size=4, num_centers=8, use_subsampling=True):
 		super(LightweightEncoder, self).__init__()
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
 		self.centers = torch.nn.Parameter(torch.rand(num_centers))
-		self.pool = nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+		self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
-	def forward(self, x, ss_map=None):
+		if use_subsampling:
+			self.conv = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
+			self.bn = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		self.use_subsampling = use_subsampling
+
+	def forward(self, xtuple):
+		x,thresh = xtuple
+		# feature extraction
+		if self.use_subsampling:
+			feat = self.conv(F.relu(self.bn(x)))
+			feat = (torch.tanh(feat)+1)/2
+
 		# sample from input
 		x = self.sample(x)
+		r = 1./16
 
 		# quantization
 		xsize = list(x.size())
@@ -222,20 +234,17 @@ class LightweightEncoder(nn.Module):
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
 		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
 		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
-		x = hardout
+		x = softout
 
 		# subsampling
-		# B,C,H,W = x.size()
-		# assert(H%2==0 and W%2==0)
-		# # need a subsample map: B,C,H/2,W/2
-		# # each entry is a value from 0 to 1
-		# # we will use a NN to compute the map
-		# # but the thresh will be learnt offline
-		# if ss_map is not None:
-		# 	ss_map = self.unpool(ss_map).type(torch.bool)
-		# 	pooled = self.pool(x)
-		# 	unpooled = self.unpool(pooled)
-		# 	x[ss_map] = unpooled[ss_map]
+		B,C,H,W = x.size()
+		assert(H%2==0 and W%2==0)
+		if self.use_subsampling:
+			# thresh = 0.5
+			ss_map = self.unpool(feat) > thresh
+			r *= (1-torch.count_nonzero(ss_map)/(H*W*C*B)*0.75)
+			unpooled = self.unpool(self.pool(x))
+			x = torch.where(ss_map, unpooled, x)
 
 
 		# calculate size after compression
@@ -248,7 +257,7 @@ class LightweightEncoder(nn.Module):
 
 		# upsampling
 
-		return x
+		return x,r
 
 class Output_conv(nn.Module):
 
@@ -274,10 +283,10 @@ def init_weights(m):
 
 class DeepCOD(nn.Module):
 
-	def __init__(self, kernel_size=4, num_centers=8):
+	def __init__(self, kernel_size=4, num_centers=8, use_subsampling=True):
 		super(DeepCOD, self).__init__()
 		out_size = 3
-		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=num_centers)
+		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=num_centers, use_subsampling=use_subsampling)
 		self.attention_1 = Attention(out_size,no_of_hidden_units)
 		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
 		self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
@@ -291,8 +300,8 @@ class DeepCOD(nn.Module):
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
-	def forward(self, x, ss_map=None): 
-		x = self.encoder(x,ss_map)
+	def forward(self, xtuple):
+		x,r = self.encoder(xtuple)
 
 		# reconstruct
 		x = self.attention_1(x)
@@ -303,17 +312,18 @@ class DeepCOD(nn.Module):
 		x = self.conv2(F.relu(self.bn2(x)))
 		x = self.output_conv(x)
 		
-		return x
+		return x,r
 
 if __name__ == '__main__':
 	image = torch.randn(1,3,32,32)
 	model = DeepCOD()
-	output = model(image)
-	print(model)
+	output,r = model((image,.5))
+	# print(model)
+	print(r)
 	# print(output.shape)
 	# weight = torch.diag(torch.ones(4)).repeat(3,3,1,1)
 	# print(weight.size())
-	print(model.encoder.sample.weight.size())
+	# print(model.encoder.sample.weight.size())
 	# r = orthorgonal_regularizer(model.sample.weight,1,False)
 	# print(r)
 	# for name, param in model.named_parameters():

@@ -353,7 +353,7 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_hard_disc_c8.pth'
+    PATH = 'backup/deepcod_soft_ss_c8.pth'
     max_acc = 0
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
@@ -361,19 +361,13 @@ def deepcod_main(param,datarange):
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
 
-    # discriminator
-    lambda_gp = 10
-    discriminator = Discriminator()
-    if args.device != 'cpu':
-        discriminator = discriminator.cuda()
-
     criterion_ce = nn.CrossEntropyLoss()
     criterion_mse = nn.MSELoss()
     # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
-    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
+    # optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-
+    
     for epoch in range(1,1001):
         # training
         top1 = AverageMeter()
@@ -382,63 +376,41 @@ def deepcod_main(param,datarange):
         gen_model.train()
         # discriminator.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
+        thresh = torch.rand(1)
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
                 images = images.cuda()
                 targets = targets.cuda()
 
             # generator update
-            for p in discriminator.parameters():
-                p.requires_grad_(False)
             optimizer_g.zero_grad()
-            recon = gen_model(images)
+            recon,r = gen_model((images,thresh))
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
-            fake_validity = discriminator(normalization(images))
 
             loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-            # loss_g += criterion_ce(recon_labels, targets)
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
-            loss_g -= torch.mean(fake_validity)
+            loss_g += r
             
             loss_g.backward()
             optimizer_g.step()
-            for p in discriminator.parameters():
-                p.requires_grad_(True)
-
-            # discriminator update
-            optimizer_d.zero_grad()
-            # Real images
-            real_imgs = normalization(images)
-            real_validity = discriminator(real_imgs)
-            # Fake images
-            recon = gen_model(images)
-            fake_imgs = normalization(recon)
-            fake_validity = discriminator(fake_imgs)
-            # Gradient penalty
-            gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data, args.device != 'cpu')
-            # Adversarial loss
-            loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
-
-            # loss_d.backward()
-            optimizer_d.step()
             
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
             train_iter.set_description(
-                f"Train: {epoch:3}. "
-                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. "
-                # f"loss_d: {loss_d.cpu().item():.3f}. "
-                # f"loss0: {loss0.cpu().item():.3f}. "
+                f"Train: {epoch:3}. trsh: {thresh.item():.3f}. "
+                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
+                f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
                 )
 
         train_iter.close()
 
         # testing
         if epoch%5!=0:continue
+        thresh = torch.rand(1)
         print('Save to', PATH)
         top1 = AverageMeter()
         top5 = AverageMeter()
@@ -451,7 +423,7 @@ def deepcod_main(param,datarange):
                 targets = targets.cuda()
 
             # generator update
-            recon = gen_model(images)
+            recon,r = gen_model((images,thresh))
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
 
@@ -459,15 +431,16 @@ def deepcod_main(param,datarange):
             # loss_g += criterion_ce(recon_labels, targets)
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
-
+            loss_g += r
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
             test_iter.set_description(
-                f" Test: {epoch:3}. "
-                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. loss: {loss.avg:.3f}. "
+                f" Test: {epoch:3}. trsh: {thresh.item():.3f}. "
+                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
+                f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
                 )
 
         test_iter.close()
@@ -614,60 +587,6 @@ def disturb_exp():
         with open(loss_filename, "a") as f:
             np.savetxt(f, loss_map, fmt='%1.6f', newline="\n")
 
-        # observ = torch.zeros((64,8))
-        # C_params = torch.ones(impact.size())*0.4
-        # for col in range(8):
-        #     C_params[:,col] = 0.5
-        #     Qual_TF.reset()
-        #     tf_imgs = None
-        #     for i,th_img in enumerate(cache_images):
-        #         np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
-        #         tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy())
-        #         tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
-        #         if tf_imgs is None:
-        #             tf_imgs = tf_img
-        #         else:
-        #             tf_imgs = torch.cat((tf_imgs,tf_img),0)
-        #     images = tf_imgs
-        #     acc1,_,pred = check_accuracy(images,targets,model)
-        #     cr = Qual_TF.get_compression_ratio()
-        #     print('Metrics:',col,acc1,cr,targets.size())
-        #     observ[:,col] = pred
-        #     C_params[:,col] = 0.4
-        # gt = targets.view(64,1).repeat(1,8)
-        # maxval = torch.max(impact, dim=1, keepdim=True)[0]
-        # test = maxval == impact
-        # detect = observ == gt
-        # for row in range(observ.size(0)):
-        #     print(row,detect[row],impact[row])
-        # print(torch.max(detect,dim=1))
-
-        # lower,upper,k = param+0.5
-        # k = int(k*8)
-        # k = max(k,0); k = min(k,7)
-        # # impact driven
-        # idx = torch.topk(impact,k,dim=1)[1]
-        # C_params = torch.ones(impact.size())*lower
-        # tf_imgs = None
-        # for i,th_img in enumerate(cache_images):
-        #     np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
-        #     C_params[i,idx[i]] = float(upper)
-        #     tf_img = Qual_TF.transform(image=np_img, C_param=C_params[i,:].numpy())
-        #     tf_img = torch.from_numpy(tf_img/255).float().permute(2,0,1).unsqueeze(0)
-        #     if tf_imgs is None:
-        #         tf_imgs = tf_img
-        #     else:
-        #         tf_imgs = torch.cat((tf_imgs,tf_img),0)
-        # images = tf_imgs
-        # acc1,_,_ = check_accuracy(images,targets,model)
-        # cr = Qual_TF.get_compression_ratio()
-        # # print('Impact:',acc1,cr,loss.cpu().item())
-        # running_top1.update(float(acc1))
-        # train_iter.set_description(
-        #     f"Train Iter: {step+1:3}. Top1: {running_top1.avg:.3f} "
-        #     f"Compression Rate: {cr:.3f}. ")
-
-        
 
     test_iter.close()
 
