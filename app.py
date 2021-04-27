@@ -505,7 +505,7 @@ def deepcod_validate():
 
         test_iter.close()
 
-def disturb_exp():
+def deepcod_validate2():
     from compression.deepcod import DeepCOD, compute_gradient_penalty
     sim = Simulator(train=False)
 
@@ -531,178 +531,24 @@ def disturb_exp():
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
     gen_model.eval()
+
+    top1 = AverageMeter()
+    top5 = AverageMeter()
     test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
-    toMacroBlock = nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
-    criterion_ce = nn.CrossEntropyLoss()
-    impact_filename = 'impact.txt'
-    loss_filename = 'loss.txt'
     for step, (images, targets) in enumerate(test_iter):
         if args.device != 'cpu':
             images = images.cuda()
             targets = targets.cuda()
-        if step == 10:break
 
-        B,C,H,W = images.size()
-        # magics
-        X = Variable(images,requires_grad=True) 
-        # plot original images
-        raw = images.data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
-        fig = plot(raw)
-        plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
-        plt.close(fig)
-        # 
-        recon = gen_model(X)
+        # generator update
+        recon = gen_model(images)
         recon_labels = app_model(normalization(recon))
-        loss = criterion_ce(recon_labels, targets)
-        gradients = torch.autograd.grad(outputs=loss, inputs=X,
-                                grad_outputs=torch.ones(loss.size()),
-                              create_graph=True, retain_graph=False, only_inputs=True)[0]
-        impact = torch.norm(gradients.data, dim=1)
-        impact = toMacroBlock(impact).view(B,-1)
-        # impact /= torch.max(impact, dim=1, keepdim=True)[0]
-        _, impact = torch.sort(impact, dim=-1)
-        # impact = F.softmax(impact.view(B,-1),dim=-1)
-        # samples = impact.view(B,H//8,W//8).data.cpu().numpy()
-        # fig = plot(samples)
-        # plt.savefig(f'samples/impact_{step:1}.png', bbox_inches='tight')
-        # plt.close(fig)
-        # save to file
-        impact = impact.view(-1).data.cpu().numpy()
-        with open(impact_filename, "a") as f:
-            np.savetxt(f, impact, fmt='%1.6f', newline="\n")
 
-        # loss map
-        base_loss = loss.cpu().item()
-        assert(H%8==0 and W%8==0)
-        ss_map = torch.zeros(B,C,H//8,W//8)
-        loss_map = torch.zeros(B,H//8,W//8)
-        for b in range(B):
-            for h in range(H//8):
-                for w in range(W//8):
-                    ss_map[b,:,h,w] = 1
-                    recon = gen_model(images,ss_map)
-                    recon_labels = app_model(normalization(recon))
-                    loss = criterion_ce(recon_labels, targets)
-                    _, acc5 = accuracy(recon_labels, targets, (1, 5))
-                    loss_map[b,h,w] = loss.cpu().item() - base_loss
-                    ss_map[b,:,h,w] = 0
-        # samples = loss_map.data.cpu().numpy()
-        # fig = plot(samples)
-        # plt.savefig(f'samples/loss_map_{step:1}.png', bbox_inches='tight')
-        # plt.close(fig)
-
-        # write to file
-        _, loss_map = torch.sort(loss_map.view(B,-1), dim=-1)
-        loss_map = loss_map.view(-1).data.cpu().numpy()
-        with open(loss_filename, "a") as f:
-            np.savetxt(f, loss_map, fmt='%1.6f', newline="\n")
-
-
-    test_iter.close()
-
-def disturb_train(args, train_loader, model, cnn_filter, datarange=None):
-    model.eval()
-    cnn_filter.train()
-    running_loss = AverageMeter()
-    entropy = nn.CrossEntropyLoss()
-    criterion = nn.MSELoss()
-    optimizer = optim.SGD(cnn_filter.parameters(), lr=0.001, momentum=0.9)
-    toMacroBlock = nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
-    train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-    for step, (images, targets) in enumerate(train_iter):
-        if datarange is not None:
-            if step<datarange[0]:continue
-            elif step>=datarange[1]:break 
-        normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-        images = normalization(images)
-        # end transformation
-        batch_size = targets.shape[0]
-        if args.device != 'cpu':
-            images = images.cuda()
-            targets = targets.cuda()
-
-        # magics
-        X = Variable(images,requires_grad=True)
-        # raw = ((X+1)/2.).data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
-        # fig = plot(raw)
-        # plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
-        # plt.close(fig)
-        outputs = model(X)
-        loss = entropy(outputs, targets)
-        # loss = -outputs
-        gradients = torch.autograd.grad(outputs=loss, inputs=X,
-                                grad_outputs=torch.ones(loss.size()),
-                              create_graph=True, retain_graph=False, only_inputs=True)[0]
-
-        impact = torch.norm(gradients.data, dim=1)
-        impact = toMacroBlock(impact)
-        impact = impact.view(impact.size(0),-1)
-        impact /= torch.max(impact, dim=1, keepdim=True)[0] 
-        # samples = impact.view(impact.size(0),4,4).data.cpu().numpy()
-        # fig = plot(samples)
-        # plt.savefig(f'samples/max_class_{step:1}.png', bbox_inches='tight')
-        # plt.close(fig)
-
-        # zero gradient
-        optimizer.zero_grad()
-
-        # forward + backward + optimize
-        pred = cnn_filter(images)
-        loss = criterion(pred, impact)
-        loss.backward()
-        optimizer.step()
-
-        running_loss.update(loss.cpu().item())
-
-        train_iter.set_description(
-            f"Train Iter: {step+1:3}. Loss: {loss.cpu().item():.3f} "
-            f"Avg Loss: {running_loss.avg:.3f}. ")
-
-    train_iter.close()
-
-def disturb_test(args, train_loader, model, cnn_filter, datarange=None):
-    model.eval()
-    cnn_filter.eval()
-    running_loss = AverageMeter()
-    entropy = nn.CrossEntropyLoss()
-    criterion = nn.MSELoss()
-    toMacroBlock = nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
-    test_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-    for step, (images, targets) in enumerate(test_iter):
-        if datarange is not None:
-            if step<datarange[0]:continue
-            elif step>=datarange[1]:break 
-        normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-        images = normalization(images)
-        # end transformation
-        batch_size = targets.shape[0]
-        if args.device != 'cpu':
-            images = images.cuda()
-            targets = targets.cuda()
-
-        # magics
-        X = Variable(images,requires_grad=True) 
-        outputs = model(X)
-        loss = entropy(outputs, targets)
-        gradients = torch.autograd.grad(outputs=loss, inputs=X,
-                                grad_outputs=torch.ones(loss.size()),
-                              create_graph=True, retain_graph=False, only_inputs=True)[0]
-
-        impact = torch.norm(gradients.data, dim=1)
-        impact = toMacroBlock(impact)
-        impact = impact.view(impact.size(0),-1)
-        impact /= torch.max(impact, dim=1, keepdim=True)[0] 
-
-        # forward + backward + optimize
-        with torch.no_grad():
-            pred = cnn_filter(images)
-            loss = criterion(pred, impact)
-
-        running_loss.update(loss.cpu().item())
-
+        acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
+        top1.update(acc1[0], targets.shape[0])
+        top5.update(acc5[0], targets.shape[0])
         test_iter.set_description(
-            f"Test Iter: {step+1:3}. Loss: {loss.cpu().item():.3f} "
-            f"Avg Loss: {running_loss.avg:.3f}. ")
+            f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. ")
 
     test_iter.close()
 
