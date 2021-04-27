@@ -377,6 +377,7 @@ def deepcod_main(param,datarange):
         # discriminator.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
         thresh = torch.rand(1)
+        if args.device != 'cpu': thresh = thresh.cuda()
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
                 images = images.cuda()
@@ -411,6 +412,7 @@ def deepcod_main(param,datarange):
         # testing
         if epoch%5!=0:continue
         thresh = torch.rand(1)
+        if args.device != 'cpu': thresh = thresh.cuda()
         print('Save to', PATH)
         top1 = AverageMeter()
         top5 = AverageMeter()
