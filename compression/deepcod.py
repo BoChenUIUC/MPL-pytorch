@@ -216,10 +216,10 @@ class LightweightEncoder(nn.Module):
 			self.bn = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		self.use_subsampling = use_subsampling
 
-	def forward(self, xtuple):
-		x,thresh = xtuple
+	def forward(self, x):
 		# feature extraction
 		if self.use_subsampling:
+			x,thresh = x
 			feat = self.conv(F.relu(self.bn(x)))
 			feat = (torch.tanh(feat)+1)/2
 
@@ -300,8 +300,8 @@ class DeepCOD(nn.Module):
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
-	def forward(self, xtuple):
-		x,r = self.encoder(xtuple)
+	def forward(self, x):
+		x,r = self.encoder(x)
 
 		# reconstruct
 		x = self.attention_1(x)
