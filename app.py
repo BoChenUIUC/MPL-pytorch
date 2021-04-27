@@ -541,7 +541,7 @@ def deepcod_validate2():
             targets = targets.cuda()
 
         # generator update
-        recon = gen_model(images)
+        recon,r = gen_model(images)
         recon_labels = app_model(normalization(recon))
 
         acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
