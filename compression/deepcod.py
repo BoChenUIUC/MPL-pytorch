@@ -212,19 +212,17 @@ class LightweightEncoder(nn.Module):
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
 		if use_subsampling:
-			self.conv = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
-			self.bn = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+			self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
+			self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+			self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+			self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		self.use_subsampling = use_subsampling
 
 	def forward(self, x):
-		# feature extraction
 		if self.use_subsampling:
-			x,thresh = x
-			feat = self.conv(F.relu(self.bn(x)))
-			feat = (torch.tanh(feat)+1)/2
-
+			x_init,thresh = x
 		# sample from input
-		x = self.sample(x)
+		x = self.sample(x_init)
 		r = 1./16
 
 		# quantization
@@ -240,11 +238,31 @@ class LightweightEncoder(nn.Module):
 		B,C,H,W = x.size()
 		assert(H%2==0 and W%2==0)
 		if self.use_subsampling:
-			# thresh = 0.5
-			ss_map = self.unpool(feat) > thresh
-			r *= (1-torch.count_nonzero(ss_map)/(H*W*C*B)*0.75)
-			unpooled = self.unpool(self.pool(x))
-			x = torch.where(ss_map, unpooled, x)
+			# feature L1, L2(top/most lossy) 
+			feat_1 = self.conv1(F.relu(self.bn1(x_init)))
+			feat_2 = self.conv2(F.relu(self.bn2(feat_1)))
+			feat_1 = self.unpool(feat_1)
+			feat_2 = self.unpool(self.unpool(feat_2))
+			# thresh 1,2,3
+			th_1, th_2 = thresh
+			# sub-sample
+			ss_1 = self.unpool(self.pool(x))
+			ss_2 = self.unpool(self.unpool(self.pool(self.pool(x))))
+			# conditions
+			cond_2 = (torch.tanh(feat_2)+1)/2<th_2
+			cond_1 = torch.logical_and(torch.logical_not(cond_2),(torch.tanh(feat_1)+1)/2<th_1)
+			# fill in
+			x = torch.where(cond_1, ss_1, x)
+			x = torch.where(cond_2, ss_2, x)
+			mult = 1
+			mult -= torch.count_nonzero(cond_1)/(H*W*C*B)*(1-0.5**4)
+			mult -= torch.count_nonzero(cond_2)/(H*W*C*B)*(1-0.5**2)
+			r *= mult
+
+			# ss_map = self.unpool(feat) > thresh
+			# r *= (1-torch.count_nonzero(ss_map)/(H*W*C*B)*0.75)
+			# unpooled = self.unpool(self.pool(x))
+			# x = torch.where(ss_map, unpooled, x)
 
 
 		# calculate size after compression
@@ -317,7 +335,7 @@ class DeepCOD(nn.Module):
 if __name__ == '__main__':
 	image = torch.randn(1,3,32,32)
 	model = DeepCOD()
-	output,r = model((image,.5))
+	output,r = model((image,(.5,.5)))
 	# print(model)
 	print(r)
 	# print(output.shape)

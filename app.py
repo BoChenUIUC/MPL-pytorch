@@ -376,8 +376,9 @@ def deepcod_main(param,datarange):
         gen_model.train()
         # discriminator.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-        thresh = torch.rand(1)
+        thresh = torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
+        print(thresh)
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
                 images = images.cuda()
@@ -402,7 +403,7 @@ def deepcod_main(param,datarange):
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
             train_iter.set_description(
-                f"Train: {epoch:3}. trsh: {thresh.item():.3f}. "
+                f"Train: {epoch:3}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                 f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
                 )
@@ -411,9 +412,9 @@ def deepcod_main(param,datarange):
 
         # testing
         if epoch%5!=0:continue
-        thresh = torch.rand(1)
+        thresh = torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
-        print('Save to', PATH)
+        print('Save to', PATH,thresh)
         top1 = AverageMeter()
         top5 = AverageMeter()
         loss = AverageMeter()
@@ -440,7 +441,7 @@ def deepcod_main(param,datarange):
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
             test_iter.set_description(
-                f" Test: {epoch:3}. trsh: {thresh.item():.3f}. "
+                f" Test: {epoch:3}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                 f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
                 )
