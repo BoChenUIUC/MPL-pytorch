@@ -583,8 +583,8 @@ def dual_train(net):
 
 def test():
 	from app import deepcod_main,deepcod_validate,disturb_exp
-	deepcod_main(np.array([-0.1,0,-0.3]),None)
-	# deepcod_validate()
+	# deepcod_main(np.array([-0.1,0,-0.3]),None)
+	deepcod_validate()
 	# disturb_exp()
 
 if __name__ == "__main__":
