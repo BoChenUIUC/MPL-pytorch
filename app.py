@@ -378,7 +378,6 @@ def deepcod_main(param,datarange):
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
         thresh = torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
-        print(thresh)
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
                 images = images.cuda()
@@ -386,14 +385,15 @@ def deepcod_main(param,datarange):
 
             # generator update
             optimizer_g.zero_grad()
-            recon,r = gen_model((images,thresh))
+            recon,res = gen_model((images,thresh))
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
 
             loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
-            loss_g += r
+            esti_cr,_,std = res
+            loss_g += esti_cr - 0.01*std
             
             loss_g.backward()
             optimizer_g.step()
@@ -403,15 +403,16 @@ def deepcod_main(param,datarange):
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
             train_iter.set_description(
-                f"Train: {epoch:3}. "
+                f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
+                f"loss: {loss.avg:.3f}. cr: {esti_cr:.4f}. std: {std:.3f}. "
                 )
 
         train_iter.close()
 
         # testing
         if epoch%5!=0:continue
+        # need to choose some anchors
         thresh = torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
         print('Save to', PATH,thresh)
@@ -426,7 +427,7 @@ def deepcod_main(param,datarange):
                 targets = targets.cuda()
 
             # generator update
-            recon,r = gen_model((images,thresh))
+            recon,res = gen_model((images,thresh))
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
 
@@ -434,16 +435,17 @@ def deepcod_main(param,datarange):
             # loss_g += criterion_ce(recon_labels, targets)
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
-            loss_g += r
+            esti_cr,_,std = res
+            loss_g += esti_cr - 0.01*std
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
             test_iter.set_description(
-                f" Test: {epoch:3}. "
+                f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
+                f"loss: {loss.avg:.3f}. cr: {esti_cr:.4f}. std: {std:.3f}. "
                 )
 
         test_iter.close()

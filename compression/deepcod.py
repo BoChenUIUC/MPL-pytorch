@@ -9,6 +9,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import spectral_norm
+from huffman import HuffmanCoding
 
 no_of_hidden_units = 196
 class Discriminator(nn.Module):
@@ -223,59 +224,69 @@ class LightweightEncoder(nn.Module):
 			x_init,thresh = x
 		# sample from input
 		x = self.sample(x_init)
-		r = 1./16
-
-		# quantization
-		xsize = list(x.size())
-		x = x.view(*(xsize + [1]))
-		quant_dist = torch.pow(x-self.centers, 2)
-		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
-		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
-		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
-		x = softout
 
 		# subsampling
+		# data to be sent: mask + actual data
 		B,C,H,W = x.size()
 		assert(H%2==0 and W%2==0)
 		if self.use_subsampling:
 			# feature L1, L2(top/most lossy) 
 			feat_1 = self.conv1(F.relu(self.bn1(x_init)))
 			feat_2 = self.conv2(F.relu(self.bn2(feat_1)))
-			feat_1 = self.unpool(feat_1)
-			feat_2 = self.unpool(self.unpool(feat_2))
+			feat_1_ = self.unpool(feat_1)
+			feat_2_ = self.unpool(self.unpool(feat_2))
+			feat_1_ = (torch.tanh(feat_1_)+1)/2
+			feat_2_ = (torch.tanh(feat_2_)+1)/2
+			feat_1 = (torch.tanh(feat_1)+1)/2
+			feat_2 = (torch.tanh(feat_2)+1)/2
 			# thresh 1,2,3
 			th_1, th_2 = thresh
 			# sub-sample
 			ss_1 = self.unpool(self.pool(x))
 			ss_2 = self.unpool(self.unpool(self.pool(self.pool(x))))
 			# conditions
-			cond_2 = (torch.tanh(feat_2)+1)/2<th_2
-			cond_1 = torch.logical_and(torch.logical_not(cond_2),(torch.tanh(feat_1)+1)/2<th_1)
-			# fill in
+			cond_2 = feat_2_<th_2
+			cond_1 = torch.logical_and(torch.logical_not(cond_2),feat_1_<th_1)
+			# subsampled data in different areas
+			data_1 = self.pool(x)[torch.logical_and(self.unpool(feat_2)>=th_2,feat_1<th_1)]
+			data_2 = self.pool(self.pool(x))[feat_2<th_2]
+			cond_0 = torch.logical_not(torch.logical_or(cond_1,cond_2))
+			data_0 = x[cond_0]
+			comp_data = torch.cat((data_0,data_1,data_2),0)
+			# affected data in the original shape
 			x = torch.where(cond_1, ss_1, x)
 			x = torch.where(cond_2, ss_2, x)
-			mult = 1
-			mult -= torch.count_nonzero(cond_1)/(H*W*C*B)*(1-0.5**4)
-			mult -= torch.count_nonzero(cond_2)/(H*W*C*B)*(1-0.5**2)
-			r *= mult
-
-			# ss_map = self.unpool(feat) > thresh
-			# r *= (1-torch.count_nonzero(ss_map)/(H*W*C*B)*0.75)
-			# unpooled = self.unpool(self.pool(x))
-			# x = torch.where(ss_map, unpooled, x)
 
 
-		# calculate size after compression
-		# need to convert it into a 1-D vector
-		# huffman coding
-
-		# running length coding
-
-		# calculate resulted size
-
-		# upsampling
-
-		return x,r
+		# quantization
+		xsize = list(x.size())
+		x = x.view(*(xsize + [1]))
+		quant_dist = torch.pow(x-self.centers, 2)
+		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
+		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
+		hardout = torch.sum(self.centers * (minval == quant_dist), dim=-1)
+		x = softout
+		if self.use_subsampling:
+			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
+			quant_dist = torch.pow(comp_data-self.centers, 2)
+			index = torch.min(quant_dist, dim=-1, keepdim=True)[1]
+			huffman = HuffmanCoding()
+			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
+			real_size += H*W*C*B/4 + H*W*C*B/16
+			esti_size = torch.count_nonzero(cond_0) + \
+						torch.count_nonzero(cond_1)/4 + \
+						torch.count_nonzero(cond_2)/16
+			esti_cr = 1/16.*esti_size/(H*W*C*B)
+			real_cr = 1/16.*real_size/(H*W*C*B*8)
+			index = index.view(-1).unsqueeze(-1)
+			counts = torch.sum(index==torch.arange(0, 8),dim=0)
+			counts = counts/torch.sum(counts)
+			std = torch.std(counts)
+			return x,(esti_cr,real_cr,std)
+		else:
+			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
+			real_cr = 1/16.*real_size/(H*W*C*B*8)
+			return x,real_cr
 
 class Output_conv(nn.Module):
 
