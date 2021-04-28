@@ -480,33 +480,34 @@ def deepcod_validate():
 
     gen_model.eval()
 
-    for epoch in range(1,11):
-        thresh = torch.FloatTensor([epoch/10.0])
-        if args.device != 'cpu': thresh = thresh.cuda()
-        top1 = AverageMeter()
-        top5 = AverageMeter()
-        test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
-        for step, (images, targets) in enumerate(test_iter):
-            if args.device != 'cpu':
-                images = images.cuda()
-                targets = targets.cuda()
+    for th1 in range(11):
+        for th2 in range(11):
+            thresh = torch.FloatTensor([th1/10.0,th2/10.0])
+            if args.device != 'cpu': thresh = thresh.cuda()
+            top1 = AverageMeter()
+            top5 = AverageMeter()
+            test_iter = tqdm(test_loader)
+            for step, (images, targets) in enumerate(test_iter):
+                if args.device != 'cpu':
+                    images = images.cuda()
+                    targets = targets.cuda()
 
-            # generator update
-            recon,r = gen_model((images,thresh))
-            recon_labels = app_model(normalization(recon))
+                # generator update
+                recon,r = gen_model((images,thresh))
+                recon_labels = app_model(normalization(recon))
 
-            acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
-            top1.update(acc1[0], targets.shape[0])
-            top5.update(acc5[0], targets.shape[0])
-            test_iter.set_description(
-                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                f"trsh: {thresh.item():.3f}. cr: {r:.4f}. ")
-            with open("acc.log", "a") as f:
-                f.write(f"{top5.avg:.3f}\n")
-            with open("r.log", "a") as f:
-                f.write(f"{r:.3f}\n")
+                acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
+                top1.update(acc1[0], targets.shape[0])
+                top5.update(acc5[0], targets.shape[0])
+                test_iter.set_description(
+                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
+                    f"trsh: {thresh.item():.3f}. cr: {r:.4f}. ")
+                with open("acc.log", "a") as f:
+                    f.write(f"{top5.avg:.3f}\n")
+                with open("cr.log", "a") as f:
+                    f.write(f"{r:.3f}\n")
 
-        test_iter.close()
+            test_iter.close()
 
 def deepcod_validate2():
     from compression.deepcod import DeepCOD, compute_gradient_penalty

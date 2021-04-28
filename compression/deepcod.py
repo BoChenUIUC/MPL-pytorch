@@ -228,7 +228,7 @@ class LightweightEncoder(nn.Module):
 		# subsampling
 		# data to be sent: mask + actual data
 		B,C,H,W = x.size()
-		assert(H%2==0 and W%2==0)
+		assert(H%4==0 and W%4==0)
 		if self.use_subsampling:
 			# feature L1, L2(top/most lossy) 
 			feat_1 = self.conv1(F.relu(self.bn1(x_init)))
@@ -285,6 +285,7 @@ class LightweightEncoder(nn.Module):
 			std = torch.std(counts)
 			return x,(esti_cr,real_cr,std)
 		else:
+			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			return x,real_cr
