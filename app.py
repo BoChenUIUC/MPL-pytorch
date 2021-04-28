@@ -377,25 +377,36 @@ def deepcod_main(use_subsampling=True):
                 targets = targets.cuda()
 
             # generator update
-            recon,res = gen_model((images,thresh))
+            if use_subsampling:
+                recon,res = gen_model((images,thresh))
+            else:
+                recon,r = gen_model(images)
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
 
             loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
-            esti_cr,_,std = res
-            loss_g += esti_cr - 0.01*std
+            if use_subsampling:
+                esti_cr,_,std = res
+                loss_g += esti_cr - 0.01*std
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
-            test_iter.set_description(
-                f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
-                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                f"loss: {loss.avg:.3f}. cr: {esti_cr:.4f}. std: {std:.3f}. "
-                )
+            if use_subsampling:
+                test_iter.set_description(
+                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
+                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
+                    f"loss: {loss.avg:.3f}. cr: {esti_cr:.4f}. std: {std:.3f}. "
+                    )
+            else:
+                test_iter.set_description(
+                    f" Test: {epoch:3}. "
+                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
+                    f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
+                    )
 
         test_iter.close()
         if top5.avg > max_acc:
@@ -456,9 +467,9 @@ def deepcod_validate():
                 with open("acc.log", "a") as f:
                     f.write(f"{top5.avg:.3f}\n")
                 with open("real_cr.log", "a") as f:
-                    f.write(f"{real_cr:.3f}\n")
+                    f.write(f"{real_cr:.5f}\n")
                 with open("esti_cr.log", "a") as f:
-                    f.write(f"{esti_cr:.3f}\n")
+                    f.write(f"{esti_cr:.5f}\n")
 
             test_iter.close()
 
@@ -508,6 +519,7 @@ def deepcod_validate2():
             f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. r: {r:.4f}. ")
 
     test_iter.close()
+    # top1: 74.24. top5: 95.95. r: 0.0060.
 
 class Simulator:
     def __init__(self,train=True,usemodel=True):
