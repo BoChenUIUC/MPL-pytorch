@@ -281,64 +281,7 @@ def plot(samples):
         plt.imshow(sample)
     return fig
 
-class TwoLayer(nn.Module):
-    def __init__(self):
-        super(TwoLayer, self).__init__()
-        num_features = 128
-        self.conv1 = nn.Conv2d(3, num_features, kernel_size=3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(num_features)
-        self.conv2 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
-        self.bn2 = nn.BatchNorm2d(num_features)
-        self.conv3 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
-        self.bn3 = nn.BatchNorm2d(num_features)
-        self.conv4 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
-        self.bn4 = nn.BatchNorm2d(num_features)
-        self.conv5 = nn.Conv2d(num_features, 1, kernel_size=3, stride=1, padding=1)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
-
-    def forward(self, x):
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))
-        x = (F.relu(self.bn2(self.conv2(x))))
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))
-        x = (F.relu(self.bn4(self.conv4(x))))
-        x = self.pool(((self.conv5(x))))
-        x = x.view(x.size(0), -1)
-        x = F.tanh(x)
-        x = x * 0.5 + 0.5
-        return x
-
-def disturb_main(param,datarange):
-    sim_train = Simulator(train=True)
-    return disturb_exp(sim_train.opt, sim_train.dataloader, sim_train.model, param, datarange)
-    # sim_test = Simulator(train=False)
-    # PATH = 'backup/sf.pth'
-    # net = TwoLayer()
-    # if sim_train.opt.device != 'cpu':
-    #     net = net.cuda()
-    # net.load_state_dict(torch.load(PATH,map_location='cpu'))
-    # net.eval()
-
-    # for i in range(10):
-    #     s = time.perf_counter()
-    #     print(net(torch.randn(1, 3, 32, 32)).shape)
-    #     print(time.perf_counter()-s)
-    # return 
-    # for epoch in range(10):
-    #     disturb_train(sim_train.opt, sim_train.dataloader, sim_train.model, net)
-    #     disturb_test(sim_test.opt, sim_test.dataloader, sim_test.model, net)
-    #     torch.save(net.state_dict(), PATH)
-
-def check_accuracy(images,targets,model):
-    normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-    images = normalization(images)
-    batch_size = targets.shape[0]
-    outputs = model(images)
-    entropy = nn.CrossEntropyLoss()
-    loss = entropy(outputs, targets)
-    acc1,_ = accuracy(outputs, targets, (1,5))
-    return acc1,loss,torch.max(outputs,axis=1)[1]
-
-def deepcod_main(param,datarange):
+def deepcod_main(use_subsampling=True):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights, Discriminator, compute_gradient_penalty
     sim_train = Simulator(train=True)
     sim_test = Simulator(train=False,usemodel=False)
@@ -353,19 +296,15 @@ def deepcod_main(param,datarange):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_soft_ss_c8.pth'
+    PATH = 'backup/deepcod_soft_ss_c8.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
-    gen_model = DeepCOD()
+    gen_model = DeepCOD(use_subsampling)
     gen_model.apply(init_weights)
-    # gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
 
-    criterion_ce = nn.CrossEntropyLoss()
     criterion_mse = nn.MSELoss()
-    # optimizer = optim.SGD(gen_model.parameters(), lr=0.001, momentum=0.9)
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
-    # optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
     
     for epoch in range(1,1001):
@@ -385,15 +324,19 @@ def deepcod_main(param,datarange):
 
             # generator update
             optimizer_g.zero_grad()
-            recon,res = gen_model((images,thresh))
+            if use_subsampling:
+                recon,res = gen_model((images,thresh))
+            else:
+                recon,r = gen_model(images)
             recon_labels,recon_features = app_model(normalization(recon),True)
             _,origin_features = app_model(normalization(images),True)
 
             loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
-            esti_cr,_,std = res
-            loss_g += esti_cr - 0.01*std
+            if use_subsampling:
+                esti_cr,_,std = res
+                loss_g += esti_cr - 0.01*std
             
             loss_g.backward()
             optimizer_g.step()
@@ -402,11 +345,18 @@ def deepcod_main(param,datarange):
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
-            train_iter.set_description(
-                f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
-                f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                f"loss: {loss.avg:.3f}. cr: {esti_cr:.4f}. std: {std:.3f}. "
-                )
+            if use_subsampling:
+                train_iter.set_description(
+                    f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
+                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
+                    f"loss: {loss.avg:.3f}. cr: {esti_cr:.4f}. std: {std:.3f}. "
+                    )
+            else:
+                train_iter.set_description(
+                    f"Train: {epoch:3}. "
+                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
+                    f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
+                    )
 
         train_iter.close()
 
@@ -432,7 +382,6 @@ def deepcod_main(param,datarange):
             _,origin_features = app_model(normalization(images),True)
 
             loss_g = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,args.device != 'cpu')
-            # loss_g += criterion_ce(recon_labels, targets)
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             esti_cr,_,std = res
@@ -556,7 +505,7 @@ def deepcod_validate2():
         top1.update(acc1[0], targets.shape[0])
         top5.update(acc5[0], targets.shape[0])
         test_iter.set_description(
-            f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. ")
+            f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. r: {r:.4f}. ")
 
     test_iter.close()
 
