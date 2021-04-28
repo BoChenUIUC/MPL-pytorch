@@ -77,6 +77,7 @@ def setup_opt():
                         help='number of nodes for distributed training')
     parser.add_argument("--local_rank", type=int, default=-1,
                         help="For distributed training: local_rank")
+    parser.add_argument("--use_subsampling", default=0, type=int, help="subsample to extract context")
     args = parser.parse_args()
     return args
 
@@ -281,8 +282,8 @@ def plot(samples):
         plt.imshow(sample)
     return fig
 
-def deepcod_main(use_subsampling=True):
-    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights, Discriminator, compute_gradient_penalty
+def deepcod_main():
+    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True)
     sim_test = Simulator(train=False,usemodel=False)
 
@@ -290,6 +291,7 @@ def deepcod_main(use_subsampling=True):
     train_loader = sim_train.dataloader
     test_loader = sim_test.dataloader
     args = sim_train.opt
+    use_subsampling=args.use_subsampling
 
     # discriminator
     app_model = sim_train.model
@@ -298,7 +300,7 @@ def deepcod_main(use_subsampling=True):
     # encoder+decoder
     PATH = 'backup/deepcod_soft_ss_c8.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
-    gen_model = DeepCOD(use_subsampling)
+    gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
@@ -313,7 +315,6 @@ def deepcod_main(use_subsampling=True):
         top5 = AverageMeter()
         loss = AverageMeter()
         gen_model.train()
-        # discriminator.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
         thresh = torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
@@ -336,7 +337,7 @@ def deepcod_main(use_subsampling=True):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 esti_cr,_,std = res
-                loss_g += esti_cr - 0.01*std
+                loss_g += esti_cr - 0.0001*std
             
             loss_g.backward()
             optimizer_g.step()
@@ -363,7 +364,7 @@ def deepcod_main(use_subsampling=True):
         # testing
         if epoch%5!=0:continue
         # need to choose some anchors
-        thresh = torch.rand(2)
+        thresh = torch.FloatTensor([0,0])
         if args.device != 'cpu': thresh = thresh.cuda()
         print('Save to', PATH,thresh)
         top1 = AverageMeter()
@@ -389,7 +390,7 @@ def deepcod_main(use_subsampling=True):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 esti_cr,_,std = res
-                loss_g += esti_cr - 0.01*std
+                loss_g += esti_cr - 0.0001*std
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
@@ -432,9 +433,6 @@ def deepcod_validate():
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
-
-    # print(gen_model.encoder.centers.data)
-    # exit(0)
 
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 

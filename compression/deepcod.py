@@ -12,96 +12,6 @@ from torch.nn.utils import spectral_norm
 from huffman import HuffmanCoding
 
 no_of_hidden_units = 196
-class Discriminator(nn.Module):
-	def __init__(self):
-		super(Discriminator, self).__init__()
-		self.conv1 = nn.Conv2d(3, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		self.ln1 = nn.LayerNorm([no_of_hidden_units,32,32])
-		self.lrelu1 = nn.LeakyReLU()
-
-		self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
-		self.ln2 = nn.LayerNorm([no_of_hidden_units,16,16])
-		self.lrelu2 = nn.LeakyReLU()
-
-		self.conv3 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		self.ln3 = nn.LayerNorm([no_of_hidden_units,16,16])
-		self.lrelu3 = nn.LeakyReLU()
-
-		self.conv4 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
-		self.ln4 = nn.LayerNorm([no_of_hidden_units,8,8])
-		self.lrelu4 = nn.LeakyReLU()
-
-		self.conv5 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		self.ln5 = nn.LayerNorm([no_of_hidden_units,8,8])
-		self.lrelu5 = nn.LeakyReLU()
-
-		self.conv6 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		self.ln6 = nn.LayerNorm([no_of_hidden_units,8,8])
-		self.lrelu6 = nn.LeakyReLU()
-
-		self.conv7 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		self.ln7 = nn.LayerNorm([no_of_hidden_units,8,8])
-		self.lrelu7 = nn.LeakyReLU()
-
-		self.conv8 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
-		self.ln8 = nn.LayerNorm([no_of_hidden_units,4,4])
-		self.lrelu8 = nn.LeakyReLU()
-
-		self.pool = nn.MaxPool2d(4, 4)
-		self.fc1 = nn.Linear(no_of_hidden_units, 1)
-
-	def forward(self, x, extract_features=0):
-		x = self.ln1(self.lrelu1(self.conv1(x)))
-		x = self.ln2(self.lrelu2(self.conv2(x)))
-		x = self.ln3(self.lrelu3(self.conv3(x)))
-		x = self.ln4(self.lrelu4(self.conv4(x)))
-		x = self.ln5(self.lrelu5(self.conv5(x)))
-		x = self.ln6(self.lrelu6(self.conv6(x)))
-		x = self.ln7(self.lrelu7(self.conv7(x)))
-		x = self.ln8(self.lrelu8(self.conv8(x)))
-		x = self.pool(x)
-		x = x.view(-1, no_of_hidden_units)
-		y1 = self.fc1(x)
-		return y1
-
-class Generator(nn.Module):
-    def __init__(self):
-        super(Generator, self).__init__()
-        self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-        self.conv2 = spectral_norm(self.conv2)
-        self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
-
-        self.conv3 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-        self.conv3 = spectral_norm(self.conv3)
-        self.bn3 = nn.BatchNorm2d(no_of_hidden_units)
-
-        self.conv4 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-        self.conv4 = spectral_norm(self.conv4)
-        self.bn4 = nn.BatchNorm2d(no_of_hidden_units)
-
-        self.conv5 = nn.ConvTranspose2d(no_of_hidden_units, no_of_hidden_units, 4, stride=2, padding=1)
-        self.conv5 = spectral_norm(self.conv5)
-        self.bn5 = nn.BatchNorm2d(no_of_hidden_units)
-
-        self.conv6 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-        self.conv6 = spectral_norm(self.conv6)
-        self.bn6 = nn.BatchNorm2d(no_of_hidden_units)
-
-        self.conv7 = nn.ConvTranspose2d(no_of_hidden_units, no_of_hidden_units, 4, stride=2, padding=1)
-        self.conv7 = spectral_norm(self.conv7)
-        self.bn7 = nn.BatchNorm2d(no_of_hidden_units)
-
-        self.conv8 = nn.Conv2d(no_of_hidden_units, 3, 3, stride=1, padding=1)
-        self.conv8 = spectral_norm(self.conv8)
-    def forward(self,x):
-        x = self.bn2(F.relu(self.conv2(x)))
-        x = self.bn3(F.relu(self.conv3(x)))
-        x = self.bn4(F.relu(self.conv4(x)))
-        x = self.bn5(F.relu(self.conv5(x)))
-        x = self.bn6(F.relu(self.conv6(x)))
-        x = self.bn7(F.relu(self.conv7(x)))
-        x = self.conv8(x)
-        return torch.tanh(x)
 
 def compute_gradient_penalty(D, real_samples, fake_samples, cuda):
 	"""Calculates the gradient penalty loss for WGAN GP"""
@@ -324,12 +234,12 @@ class DeepCOD(nn.Module):
 		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
 		self.attention_2 = Attention(no_of_hidden_units,no_of_hidden_units)
 		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
-		self.conv1 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-		self.conv1 = spectral_norm(self.conv1)
-		self.bn1 = nn.BatchNorm2d(no_of_hidden_units)
-		self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
-		self.conv2 = spectral_norm(self.conv2)
-		self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
+		# self.conv1 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+		# self.conv1 = spectral_norm(self.conv1)
+		# self.bn1 = nn.BatchNorm2d(no_of_hidden_units)
+		# self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, 3, stride=1, padding=1)
+		# self.conv2 = spectral_norm(self.conv2)
+		# self.bn2 = nn.BatchNorm2d(no_of_hidden_units)
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
@@ -341,8 +251,8 @@ class DeepCOD(nn.Module):
 		x = self.resblock_up1(x)
 		x = self.attention_2(x)
 		x = self.resblock_up2(x)
-		x = self.conv1(F.relu(self.bn1(x)))
-		x = self.conv2(F.relu(self.bn2(x)))
+		# x = self.conv1(F.relu(self.bn1(x)))
+		# x = self.conv2(F.relu(self.bn2(x)))
 		x = self.output_conv(x)
 		
 		return x,r
