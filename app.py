@@ -493,19 +493,23 @@ def deepcod_validate():
                     targets = targets.cuda()
 
                 # generator update
-                recon,r = gen_model((images,thresh))
+                recon,res = gen_model((images,thresh))
                 recon_labels = app_model(normalization(recon))
 
+                esti_cr,real_cr,std = res
                 acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
                 top1.update(acc1[0], targets.shape[0])
                 top5.update(acc5[0], targets.shape[0])
                 test_iter.set_description(
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                    f"cr: {r:.4f}. ")
+                    f"Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
+                    f"real: {real_cr:.4f}. esti: {esti_cr:.4f}")
                 with open("acc.log", "a") as f:
                     f.write(f"{top5.avg:.3f}\n")
-                with open("cr.log", "a") as f:
-                    f.write(f"{r:.3f}\n")
+                with open("real_cr.log", "a") as f:
+                    f.write(f"{real_cr:.3f}\n")
+                with open("esti_cr.log", "a") as f:
+                    f.write(f"{esti_cr:.3f}\n")
 
             test_iter.close()
 
