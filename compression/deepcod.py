@@ -220,10 +220,12 @@ class LightweightEncoder(nn.Module):
 		self.use_subsampling = use_subsampling
 
 	def forward(self, x):
+		# sample from input
 		if self.use_subsampling:
 			x_init,thresh = x
-		# sample from input
-		x = self.sample(x_init)
+			x = self.sample(x_init)
+		else:
+			x = self.sample(x)
 
 		# subsampling
 		# data to be sent: mask + actual data
