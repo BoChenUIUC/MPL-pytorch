@@ -501,7 +501,7 @@ def deepcod_validate():
                 top5.update(acc5[0], targets.shape[0])
                 test_iter.set_description(
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                    f"Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. cr: {r:.4f}. ")
+                    f"cr: {r:.4f}. ")
                 with open("acc.log", "a") as f:
                     f.write(f"{top5.avg:.3f}\n")
                 with open("cr.log", "a") as f:
