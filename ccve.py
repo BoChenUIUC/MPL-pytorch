@@ -623,7 +623,7 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	# for name in ['TiledLegacy']:
+	# for name in ['Scale','JPEG','WebP']:
 	# 	evaluation(name)
 
 	# caculate metrics

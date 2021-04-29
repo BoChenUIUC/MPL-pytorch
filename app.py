@@ -211,7 +211,7 @@ def run_model(args, test_loader, model, datarange=None,TF=None,C_param=None):
                 f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. ")
 
         test_iter.close()
-        return top1.avg/100#, top5.avg
+        return top5.avg/100#, top5.avg
 
 def run_model_multi_range(args, test_loader, model, ranges=None,TF=None,C_param=None):
     batch_time = AverageMeter()
@@ -317,7 +317,7 @@ def deepcod_main():
         rlcr = AverageMeter()
         gen_model.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-        thresh = torch.FloatTensor([0.1,0.2])#torch.rand(2)
+        thresh = torch.FloatTensor([0.0,0.0])#torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
@@ -366,8 +366,8 @@ def deepcod_main():
         # testing
         if epoch%5!=0:continue
         # need to choose some anchors
-        thresh = torch.FloatTensor([0.1,0.2])
-        if args.device != 'cpu': thresh = thresh.cuda()
+        # thresh = torch.FloatTensor([0.1,0.2])
+        # if args.device != 'cpu': thresh = thresh.cuda()
         print('Save to', PATH,thresh)
         top1 = AverageMeter()
         top5 = AverageMeter()
@@ -495,9 +495,6 @@ def deepcod_validate2():
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
 
-    # print(gen_model.encoder.centers.data)
-    # exit(0)
-
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
     gen_model.eval()
@@ -518,7 +515,7 @@ def deepcod_validate2():
         top1.update(acc1[0], targets.shape[0])
         top5.update(acc5[0], targets.shape[0])
         test_iter.set_description(
-            f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. r: {r:.4f}. ")
+            f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. r: {r:.5f}. ")
 
     test_iter.close()
     # top1: 74.24. top5: 95.76. r: 0.0073.

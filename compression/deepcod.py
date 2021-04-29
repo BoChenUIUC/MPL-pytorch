@@ -145,12 +145,12 @@ class LightweightEncoder(nn.Module):
 			# feature L1, L2(top/most lossy) 
 			feat_1 = self.conv1(F.relu(self.bn1(x_init)))
 			feat_2 = self.conv2(F.relu(self.bn2(feat_1)))
+			feat_1 = (torch.tanh(feat_1)+1)/2
+			feat_2 = (torch.tanh(feat_2)+1)/2
 			feat_1_ = self.unpool(feat_1)
 			feat_2_ = self.unpool(self.unpool(feat_2))
 			feat_1_ = (torch.tanh(feat_1_)+1)/2
 			feat_2_ = (torch.tanh(feat_2_)+1)/2
-			feat_1 = (torch.tanh(feat_1)+1)/2
-			feat_2 = (torch.tanh(feat_2)+1)/2
 			# thresh 1,2,3
 			th_1, th_2 = thresh
 			# sub-sample
