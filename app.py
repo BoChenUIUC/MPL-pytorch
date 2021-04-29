@@ -317,7 +317,7 @@ def deepcod_main():
         rlcr = AverageMeter()
         gen_model.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-        thresh = torch.rand(2)
+        thresh = torch.FloatTensor([0.1,0.2])#torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
@@ -366,7 +366,7 @@ def deepcod_main():
         # testing
         if epoch%5!=0:continue
         # need to choose some anchors
-        thresh = torch.FloatTensor([0,0])
+        thresh = torch.FloatTensor([0.1,0.2])
         if args.device != 'cpu': thresh = thresh.cuda()
         print('Save to', PATH,thresh)
         top1 = AverageMeter()
