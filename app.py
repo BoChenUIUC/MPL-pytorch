@@ -317,7 +317,7 @@ def deepcod_main():
         rlcr = AverageMeter()
         gen_model.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-        thresh = torch.FloatTensor([0.1,0.1])#torch.rand(2)
+        thresh = torch.FloatTensor([0.1,0.2])#torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
@@ -338,7 +338,7 @@ def deepcod_main():
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 esti_cr,real_cr,std = res
-                loss_g += esti_cr - 0.0001*std
+                loss_g += 0.01*esti_cr - 0.0001*std
             
             loss_g.backward()
             optimizer_g.step()
@@ -366,7 +366,7 @@ def deepcod_main():
         # testing
         if epoch%5!=0:continue
         # need to choose some anchors
-        thresh = torch.FloatTensor([0.1,0.1])
+        thresh = torch.FloatTensor([0.1,0.2])
         if args.device != 'cpu': thresh = thresh.cuda()
         print('Save to', PATH,thresh)
         top1 = AverageMeter()
@@ -393,7 +393,7 @@ def deepcod_main():
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 _,real_cr,_ = res
-                loss_g += esti_cr - 0.0001*std
+                loss_g += 0.01*esti_cr - 0.0001*std
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
