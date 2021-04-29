@@ -314,6 +314,7 @@ def deepcod_main():
         top1 = AverageMeter()
         top5 = AverageMeter()
         loss = AverageMeter()
+        rlcr = AverageMeter()
         gen_model.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
         thresh = torch.rand(2)
@@ -336,7 +337,7 @@ def deepcod_main():
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
-                esti_cr,_,std = res
+                esti_cr,real_cr,std = res
                 loss_g += esti_cr - 0.0001*std
             
             loss_g.backward()
@@ -346,17 +347,18 @@ def deepcod_main():
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
+            rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 train_iter.set_description(
                     f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                    f"loss: {loss.avg:.3f}. cr: {esti_cr:.4f}. std: {std:.3f}. "
+                    f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
             else:
                 train_iter.set_description(
                     f"Train: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                    f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
+                    f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
 
         train_iter.close()
@@ -370,6 +372,7 @@ def deepcod_main():
         top1 = AverageMeter()
         top5 = AverageMeter()
         loss = AverageMeter()
+        rlcr = AverageMeter()
         # gen_model.eval()
         test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
         for step, (images, targets) in enumerate(test_iter):
@@ -389,24 +392,25 @@ def deepcod_main():
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
-                esti_cr,_,std = res
+                _,real_cr,_ = res
                 loss_g += esti_cr - 0.0001*std
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
             top1.update(acc1[0], targets.shape[0])
             top5.update(acc5[0], targets.shape[0])
+            rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 test_iter.set_description(
                     f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                    f"loss: {loss.avg:.3f}. cr: {esti_cr:.4f}. std: {std:.3f}. "
+                    f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
             else:
                 test_iter.set_description(
                     f" Test: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                    f"loss: {loss.avg:.3f}. cr: {r:.4f}. "
+                    f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
 
         test_iter.close()
@@ -444,6 +448,7 @@ def deepcod_validate():
             if args.device != 'cpu': thresh = thresh.cuda()
             top1 = AverageMeter()
             top5 = AverageMeter()
+            cr = AverageMeter()
             test_iter = tqdm(test_loader)
             for step, (images, targets) in enumerate(test_iter):
                 if args.device != 'cpu':
@@ -454,20 +459,19 @@ def deepcod_validate():
                 recon,res = gen_model((images,thresh))
                 recon_labels = app_model(normalization(recon))
 
-                esti_cr,real_cr,std = res
+                esti_cr,real_cr,_ = res
                 acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
                 top1.update(acc1[0], targets.shape[0])
                 top5.update(acc5[0], targets.shape[0])
+                cr.update(real_cr)
                 test_iter.set_description(
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
                     f"real: {real_cr:.4f}. esti: {esti_cr:.4f}")
-                with open("acc.log", "a") as f:
-                    f.write(f"{top5.avg:.3f}\n")
-                with open("real_cr.log", "a") as f:
-                    f.write(f"{real_cr:.5f}\n")
-                with open("esti_cr.log", "a") as f:
-                    f.write(f"{esti_cr:.5f}\n")
+            with open("acc.log", "a") as f:
+                f.write(f"{top5.avg:.3f}\n")
+            with open("real_cr.log", "a") as f:
+                f.write(f"{cr.avg:.5f}\n")
 
             test_iter.close()
 
@@ -517,7 +521,7 @@ def deepcod_validate2():
             f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. r: {r:.4f}. ")
 
     test_iter.close()
-    # top1: 74.24. top5: 95.95. r: 0.0060.
+    # top1: 74.24. top5: 95.76. r: 0.0073.
 
 class Simulator:
     def __init__(self,train=True,usemodel=True):
