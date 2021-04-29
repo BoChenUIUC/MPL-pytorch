@@ -317,7 +317,7 @@ def deepcod_main():
         rlcr = AverageMeter()
         gen_model.train()
         train_iter = tqdm(train_loader, disable=args.local_rank not in [-1, 0])
-        thresh = torch.FloatTensor([0.0,0.0])#torch.rand(2)
+        thresh = torch.FloatTensor([0.0,0.1])#torch.rand(2)
         if args.device != 'cpu': thresh = thresh.cuda()
         for step, (images, targets) in enumerate(train_iter):
             if args.device != 'cpu':
