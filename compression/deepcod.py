@@ -166,8 +166,8 @@ class LightweightEncoder(nn.Module):
 			data_0 = x[cond_0]
 			comp_data = torch.cat((data_0,data_1,data_2),0)
 			# affected data in the original shape
-			# x = torch.where(cond_1, ss_1, x)
-			# x = torch.where(cond_2, ss_2, x)
+			x = torch.where(cond_1, ss_1, x)
+			x = torch.where(cond_2, ss_2, x)
 
 
 		# quantization
@@ -188,7 +188,6 @@ class LightweightEncoder(nn.Module):
 			esti_size = torch.count_nonzero(cond_0) + \
 						torch.count_nonzero(cond_1)/4 + \
 						torch.count_nonzero(cond_2)/16
-			assert(torch.count_nonzero(cond_1)==0 and torch.count_nonzero(cond_2)==0)
 			esti_cr = 1/16.*esti_size/(H*W*C*B)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			index = index.view(-1).unsqueeze(-1)
