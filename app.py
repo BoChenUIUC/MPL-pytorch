@@ -77,7 +77,7 @@ def setup_opt():
                         help='number of nodes for distributed training')
     parser.add_argument("--local_rank", type=int, default=-1,
                         help="For distributed training: local_rank")
-    parser.add_argument("--use_subsampling", default=0, type=int, help="subsample to extract context")
+    parser.add_argument("--use_subsampling", default=1, type=int, help="subsample to extract context")
     args = parser.parse_args()
     return args
 

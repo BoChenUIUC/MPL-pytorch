@@ -13,29 +13,6 @@ from huffman import HuffmanCoding
 
 no_of_hidden_units = 196
 
-def compute_gradient_penalty(D, real_samples, fake_samples, cuda):
-	"""Calculates the gradient penalty loss for WGAN GP"""
-	# Random weight term for interpolation between real and fake samples
-	alpha = torch.Tensor(np.random.random((real_samples.size(0), 1, 1, 1)))
-	if cuda:alpha = alpha.cuda()
-	# Get random interpolation between real and fake samples
-	interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
-	d_interpolates = D(interpolates)
-	fake = Variable(torch.Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
-	if cuda: fake = fake.cuda()
-	# Get gradient w.r.t. interpolates
-	gradients = torch.autograd.grad(
-		outputs=d_interpolates,
-		inputs=interpolates,
-		grad_outputs=fake,
-		create_graph=True,
-		retain_graph=True,
-		only_inputs=True,
-	)[0]
-	gradients = gradients.view(gradients.size(0), -1)
-	gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-	return gradient_penalty
-
 def orthorgonal_regularizer(w,scale,cuda=False):
 	N, C, H, W = w.size()
 	w = w.view(N*C, H, W)
@@ -46,15 +23,6 @@ def orthorgonal_regularizer(w,scale,cuda=False):
 	if cuda:tmp = tmp.cuda()
 	loss_orth = ((weight_squared * tmp) ** 2).sum()
 	return loss_orth*scale
-	# w_transpose = torch.transpose(w, 1, 2)
-	# w_mul = torch.matmul(w, w_transpose)
-	# identity = torch.diag(torch.ones(h))
-	# identity = identity.repeat(cin*cout,1,1)
-	# if cuda:
-	# 	identity = identity.cuda()
-	# l2norm = torch.nn.MSELoss()
-	# ortho_loss = l2norm(w_mul, identity)
-	# return scale * ortho_loss
 
 class Attention(nn.Module):
 
@@ -112,6 +80,29 @@ class Resblock_up(nn.Module):
 		x_init = self.deconv_skip(F.relu(self.bn3(x_init)))
 		return x + x_init
 
+class ContextExtractor(nn.Module):
+
+	def __init__(self):
+		super(ContextExtractor, self).__init__()
+		self.conv1 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		self.conv4 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		self.bn4 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+
+	def forward(self, x):
+		x = self.conv1(F.relu(self.bn1(x)))
+		x = self.conv2(F.relu(self.bn2(x)))
+		x = self.conv3(F.relu(self.bn3(x)))
+		x1 = self.conv4(F.relu(self.bn4(x)))
+		x = (torch.tanh(x)+1)/2
+		x1 = (torch.tanh(x1)+1)/2
+		return x,x1
+
+
 class LightweightEncoder(nn.Module):
 
 	def __init__(self, channels, kernel_size=4, num_centers=8, use_subsampling=True):
@@ -123,10 +114,7 @@ class LightweightEncoder(nn.Module):
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
 		if use_subsampling:
-			self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
-			self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-			self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-			self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+			self.ctx = ContextExtractor()
 		self.use_subsampling = use_subsampling
 
 	def forward(self, x):
@@ -143,14 +131,8 @@ class LightweightEncoder(nn.Module):
 		assert(H%4==0 and W%4==0)
 		if self.use_subsampling:
 			# feature L1, L2(top/most lossy) 
-			feat_1 = self.conv1(F.relu(self.bn1(x_init)))
-			feat_2 = self.conv2(F.relu(self.bn2(feat_1)))
-			feat_1 = (torch.tanh(feat_1)+1)/2
-			feat_2 = (torch.tanh(feat_2)+1)/2
-			feat_1_ = self.unpool(feat_1)
-			feat_2_ = self.unpool(self.unpool(feat_2))
-			feat_1_ = (torch.tanh(feat_1_)+1)/2
-			feat_2_ = (torch.tanh(feat_2_)+1)/2
+			feat_1,feat_2 = self.ctx(x_init)
+			feat_1_,feat_2_ = self.unpool(feat_1),self.unpool(self.unpool(feat_2))
 			# thresh 1,2,3
 			th_1, th_2 = thresh
 			# sub-sample
