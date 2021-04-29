@@ -125,7 +125,7 @@ class LightweightEncoder(nn.Module):
 		if use_subsampling:
 			self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
 			self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-			self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+			self.conv2 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
 			self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		self.use_subsampling = use_subsampling
 
