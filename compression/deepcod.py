@@ -132,7 +132,7 @@ class LightweightEncoder(nn.Module):
 			feat = self.ctx(x_init)
 			feat_ = self.unpool(feat)
 			# sub-sample
-			ss = self.unpool(self.pool1(x))
+			ss = self.unpool(self.pool(x))
 			# conditions
 			cond_1 = feat_<thresh
 			# subsampled data in different areas
@@ -163,7 +163,7 @@ class LightweightEncoder(nn.Module):
 			esti_cr = 1/16.*esti_size/(H*W*C*B)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			index = index.view(-1).unsqueeze(-1)
-			index_nums = torch.arange(0, 8)#.cuda()
+			index_nums = torch.arange(0, 8).cuda()
 			counts = torch.sum(index==index_nums,dim=0)
 			counts = counts/torch.sum(counts)
 			std = torch.std(counts)
