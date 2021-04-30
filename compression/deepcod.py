@@ -159,7 +159,7 @@ class LightweightEncoder(nn.Module):
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
 			real_size += H*W*C*B/4
-			esti_size = torch.count_nonzero(cond_1)/4
+			esti_size = torch.count_nonzero(cond_0) + torch.count_nonzero(cond_1)/4
 			esti_cr = 1/16.*esti_size/(H*W*C*B)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			index = index.view(-1).unsqueeze(-1)
