@@ -88,10 +88,10 @@ class ContextExtractor(nn.Module):
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
 		self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		self.conv3 = nn.Conv2d(3, 1, kernel_size=3, stride=2, padding=1)
 		self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv4 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		self.bn4 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		self.conv4 = nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1)
+		self.bn4 = nn.BatchNorm2d(1, momentum=0.01, eps=1e-3)
 
 	def forward(self, x):
 		x = self.conv1(F.relu(self.bn1(x)))
@@ -100,7 +100,7 @@ class ContextExtractor(nn.Module):
 		x1 = self.conv4(F.relu(self.bn4(x)))
 		x = (torch.tanh(x)+1)/2
 		x1 = (torch.tanh(x1)+1)/2
-		return x,x1
+		return x.repeat(1,3,1,1),x1.repeat(1,3,1,1)
 
 
 class LightweightEncoder(nn.Module):
@@ -166,7 +166,7 @@ class LightweightEncoder(nn.Module):
 			index = torch.min(quant_dist, dim=-1, keepdim=True)[1]
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
-			real_size += H*W*C*B/4 + H*W*C*B/16
+			real_size += H*W*1*B/4# + H*W*C*B/16
 			esti_size = torch.count_nonzero(cond_0) + \
 						torch.count_nonzero(cond_1)/4 + \
 						torch.count_nonzero(cond_2)/16
