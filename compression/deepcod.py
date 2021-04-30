@@ -88,10 +88,10 @@ class ContextExtractor(nn.Module):
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
 		self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv3 = nn.Conv2d(3, 1, kernel_size=3, stride=2, padding=1)
+		self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
 		self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv4 = nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1)
-		self.bn4 = nn.BatchNorm2d(1, momentum=0.01, eps=1e-3)
+		self.conv4 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		self.bn4 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 
 	def forward(self, x):
 		x = self.conv1(F.relu(self.bn1(x)))
@@ -100,7 +100,7 @@ class ContextExtractor(nn.Module):
 		x1 = self.conv4(F.relu(self.bn4(x)))
 		x = (torch.tanh(x)+1)/2
 		x1 = (torch.tanh(x1)+1)/2
-		return x.repeat(1,3,1,1),x1.repeat(1,3,1,1)
+		return x,x1
 
 
 class LightweightEncoder(nn.Module):
@@ -110,7 +110,10 @@ class LightweightEncoder(nn.Module):
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
 		self.centers = torch.nn.Parameter(torch.rand(num_centers))
-		self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+		# self.pool1 = nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+		# self.pool2 = nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+		self.pool1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
+		self.pool2 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
 		if use_subsampling:
@@ -136,21 +139,20 @@ class LightweightEncoder(nn.Module):
 			# thresh 1,2,3
 			th_1, th_2 = thresh
 			# sub-sample
-			ss_1 = self.unpool(self.pool(x))
-			ss_2 = self.unpool(self.unpool(self.pool(self.pool(x))))
+			ss_1 = self.unpool(self.pool1(x))
+			ss_2 = self.unpool(self.unpool(self.pool2(self.pool1(x))))
 			# conditions
 			cond_2 = feat_2_<th_2
 			cond_1 = torch.logical_and(torch.logical_not(cond_2),feat_1_<th_1)
 			# subsampled data in different areas
-			data_1 = self.pool(x)[torch.logical_and(self.unpool(feat_2)>=th_2,feat_1<th_1)]
-			data_2 = self.pool(self.pool(x))[feat_2<th_2]
+			data_1 = self.pool1(x)[torch.logical_and(self.unpool(feat_2)>=th_2,feat_1<th_1)]
+			data_2 = self.pool2(self.pool1(x))[feat_2<th_2]
 			cond_0 = torch.logical_not(torch.logical_or(cond_1,cond_2))
 			data_0 = x[cond_0]
 			comp_data = torch.cat((data_0,data_1,data_2),0)
 			# affected data in the original shape
 			x = torch.where(cond_1, ss_1, x)
 			x = torch.where(cond_2, ss_2, x)
-
 
 		# quantization
 		xsize = list(x.size())
@@ -164,16 +166,17 @@ class LightweightEncoder(nn.Module):
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
 			index = torch.min(quant_dist, dim=-1, keepdim=True)[1]
+			# running length coding
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
-			real_size += H*W*1*B/4# + H*W*C*B/16
+			real_size += H*W*C*B/4# + H*W*C*B/16
 			esti_size = torch.count_nonzero(cond_0) + \
 						torch.count_nonzero(cond_1)/4 + \
 						torch.count_nonzero(cond_2)/16
 			esti_cr = 1/16.*esti_size/(H*W*C*B)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			index = index.view(-1).unsqueeze(-1)
-			index_nums = torch.arange(0, 8).cuda()
+			index_nums = torch.arange(0, 8)#.cuda()
 			counts = torch.sum(index==index_nums,dim=0)
 			counts = counts/torch.sum(counts)
 			std = torch.std(counts)
