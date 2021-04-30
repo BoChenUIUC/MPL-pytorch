@@ -157,7 +157,7 @@ class LightweightEncoder(nn.Module):
 			esti_cr = 1/16.*esti_size/(H*W*C*B)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			index = index.view(-1).unsqueeze(-1)
-			index_nums = torch.arange(0, 8)#.cuda()
+			index_nums = torch.arange(0, 8).cuda()
 			counts = torch.sum(index==index_nums,dim=0)
 			counts = counts/torch.sum(counts)
 			std = torch.std(counts)
