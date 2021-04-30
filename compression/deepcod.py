@@ -86,15 +86,9 @@ class ContextExtractor(nn.Module):
 		super(ContextExtractor, self).__init__()
 		self.conv1 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 
 	def forward(self, x):
 		x = self.conv1(F.relu(self.bn1(x)))
-		x = self.conv2(F.relu(self.bn2(x)))
-		x = self.conv3(F.relu(self.bn3(x)))
 		x = (torch.tanh(x)+1)/2
 		return x
 
@@ -118,30 +112,29 @@ class LightweightEncoder(nn.Module):
 	def forward(self, x):
 		# sample from input
 		if self.use_subsampling:
-			x_init,thresh = x
-			x = self.sample(x_init)
-		else:
-			x = self.sample(x)
+			x,thresh = x
+		x = self.sample(x)
 
 		# subsampling
 		# data to be sent: mask + actual data
 		B,C,H,W = x.size()
-		assert(H%4==0 and W%4==0)
+		assert(H%2==0 and W%2==0)
 		if self.use_subsampling:
 			# feature L1, L2(top/most lossy) 
-			feat = self.ctx(x_init)
+			feat = self.ctx(x)
 			feat_ = self.unpool(feat)
 			# sub-sample
 			ss = self.unpool(self.pool(x))
 			# conditions
-			cond_1 = feat_<thresh
+			mask_1 = feat<thresh
+			resized_mask_1 = feat_<thresh
 			# subsampled data in different areas
-			data_1 = self.pool(x)[feat<thresh]
-			cond_0 = torch.logical_not(cond_1)
-			data_0 = x[cond_0]
+			data_1 = self.pool(x)[mask_1]
+			resized_mask_0 = torch.logical_not(resized_mask_1)
+			data_0 = x[resized_mask_0]
 			comp_data = torch.cat((data_0,data_1),0)
 			# affected data in the original shape
-			x = torch.where(cond_1, ss, x)
+			x = torch.where(resized_mask_1, ss, x)
 
 		# quantization
 		xsize = list(x.size())
@@ -155,15 +148,16 @@ class LightweightEncoder(nn.Module):
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
 			index = torch.min(quant_dist, dim=-1, keepdim=True)[1]
-			# running length coding
+			# running length coding on bitmap
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
-			real_size += H*W*C*B/4
-			esti_size = torch.count_nonzero(cond_0) + torch.count_nonzero(cond_1)/4
+			rle_len = mask_compression(mask_1.view(-1).cpu().numpy())
+			real_size += rle_len
+			esti_size = torch.count_nonzero(resized_mask_0) + torch.count_nonzero(resized_mask_1)/4
 			esti_cr = 1/16.*esti_size/(H*W*C*B)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			index = index.view(-1).unsqueeze(-1)
-			index_nums = torch.arange(0, 8).cuda()
+			index_nums = torch.arange(0, 8)#.cuda()
 			counts = torch.sum(index==index_nums,dim=0)
 			counts = counts/torch.sum(counts)
 			std = torch.std(counts)
@@ -173,6 +167,22 @@ class LightweightEncoder(nn.Module):
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			return x,real_cr
+
+def mask_compression(mask):
+	prev = 1
+	rl = 0
+	cnt = 0
+	result = []
+	for e in mask:
+		if e == prev:
+			rl += 1
+		else:
+			result += [rl]
+			rl = 0
+		prev = e
+	huffman = HuffmanCoding()
+	size = len(huffman.compress(result))*4
+	return size
 
 class Output_conv(nn.Module):
 
