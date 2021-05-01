@@ -84,14 +84,14 @@ class ContextExtractor(nn.Module):
 
 	def __init__(self):
 		super(ContextExtractor, self).__init__()
-		self.conv1 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		# self.conv1 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		# self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		# self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
 		# self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		# self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
 		# self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		# self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
-		# self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
+		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 
 	def forward(self, x):
 		x = self.conv1(F.relu(self.bn1(x)))
@@ -121,6 +121,9 @@ class LightweightEncoder(nn.Module):
 		# sample from input
 		if self.use_subsampling:
 			x,thresh = x
+			# feature 
+			feat = self.ctx(x)
+			feat_ = self.unpool(feat)
 		x = self.sample(x)
 
 		# subsampling
@@ -128,9 +131,6 @@ class LightweightEncoder(nn.Module):
 		B,C,H,W = x.size()
 		assert(H%2==0 and W%2==0)
 		if self.use_subsampling:
-			# feature 
-			feat = self.ctx(x)
-			feat_ = self.unpool(feat)
 			# sub-sample
 			ss = self.unpool(self.pool(x))
 			# conditions
