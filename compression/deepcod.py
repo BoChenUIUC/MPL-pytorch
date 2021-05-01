@@ -92,13 +92,16 @@ class ContextExtractor(nn.Module):
 		# self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		self.conv2 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
+		self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 
 	def forward(self, x):
-		x = self.conv1(F.relu(self.bn1(x)))
-		# x = self.conv2(F.relu(self.bn2(x)))
+		x1 = self.conv1(F.relu(self.bn1(x)))
+		x2 = self.conv2(F.relu(self.bn2(x1)))
 		# x = self.conv3(F.relu(self.bn3(x)))
-		x = (torch.tanh(x)+1)/2
-		return x
+		x1 = (torch.tanh(x1)+1)/2
+		x2 = (torch.tanh(x2)+1)/2
+		return x1,x2
 
 
 class LightweightEncoder(nn.Module):
@@ -110,7 +113,8 @@ class LightweightEncoder(nn.Module):
 		self.centers = torch.nn.Parameter(torch.rand(num_centers))
 		# self.pool1 = nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
 		# self.pool2 = nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
-		self.pool = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
+		self.pool1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
+		self.pool2 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
 		if use_subsampling:
@@ -122,8 +126,8 @@ class LightweightEncoder(nn.Module):
 		if self.use_subsampling:
 			x,thresh = x
 			# feature 
-			feat = self.ctx(x)
-			feat_ = self.unpool(feat)
+			feat_1,feat_2 = self.ctx(x)
+			feat_1_,feat_2_ = self.unpool(feat_1),self.unpool(self.unpool(feat_2))
 		x = self.sample(x)
 
 		# subsampling
@@ -131,18 +135,24 @@ class LightweightEncoder(nn.Module):
 		B,C,H,W = x.size()
 		assert(H%2==0 and W%2==0)
 		if self.use_subsampling:
+			th_1, th_2 = thresh
 			# sub-sample
-			ss = self.unpool(self.pool(x))
+			ss_1 = self.unpool(self.pool1(x))
+			ss_2 = self.unpool(self.unpool(self.pool2(self.pool1(x))))
 			# conditions
-			mask_1 = feat<thresh
-			resized_mask_1 = feat_<thresh
+			cond_2 = feat_2_<th_2
+			cond_1 = torch.logical_and(torch.logical_not(cond_2),feat_1_<th_1)
+			mask_1 = torch.logical_and(self.unpool(feat_2)>=th_2,feat_1<th_1)
+			mask_2 = feat_2<th_2
 			# subsampled data in different areas
-			data_1 = self.pool(x)[mask_1]
-			resized_mask_0 = torch.logical_not(resized_mask_1)
-			data_0 = x[resized_mask_0]
-			comp_data = torch.cat((data_0,data_1),0)
+			data_1 = self.pool1(x)[mask_1]
+			data_2 = self.pool2(self.pool1(x))[mask_2]
+			cond_0 = torch.logical_not(torch.logical_or(cond_1,cond_2))
+			data_0 = x[cond_0]
+			comp_data = torch.cat((data_0,data_1,data_2),0)
 			# affected data in the original shape
-			x = torch.where(resized_mask_1, ss, x)
+			x = torch.where(cond_1, ss_1, x)
+			x = torch.where(cond_2, ss_2, x)
 
 		# quantization
 		xsize = list(x.size())
@@ -159,9 +169,10 @@ class LightweightEncoder(nn.Module):
 			# running length coding on bitmap
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
-			rle_len = mask_compression(mask_1.view(-1).cpu().numpy())
-			real_size += rle_len
-			esti_size = torch.count_nonzero(resized_mask_0) + torch.count_nonzero(resized_mask_1)/4
+			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
+			rle_len2 = mask_compression(mask_2.view(-1).cpu().numpy())
+			real_size += rle_len1 + rle_len2
+			esti_size = torch.count_nonzero(cond_0) + torch.count_nonzero(cond_1)/4 + torch.count_nonzero(cond_2)/16
 			esti_cr = 1/16.*esti_size/(H*W*C*B)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			index = index.view(-1).unsqueeze(-1)
@@ -250,7 +261,7 @@ class DeepCOD(nn.Module):
 if __name__ == '__main__':
 	image = torch.randn(1,3,32,32)
 	model = DeepCOD()
-	output,r = model((image,(.5,.5)))
+	output,r = model((image,(.5,0)))
 	# print(model)
 	print(r)
 	# print(output.shape)
