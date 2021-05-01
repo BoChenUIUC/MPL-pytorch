@@ -553,9 +553,10 @@ def deepcod_main():
                     )
 
         test_iter.close()
-        if top5.avg > max_acc:
-            torch.save(gen_model.state_dict(), PATH)
-            max_acc = top5.avg
+        torch.save(gen_model.state_dict(), PATH)
+        # if top5.avg > max_acc:
+        #     torch.save(gen_model.state_dict(), PATH)
+        #     max_acc = top5.avg
 
 def deepcod_validate():
     from compression.deepcod import DeepCOD, compute_gradient_penalty
