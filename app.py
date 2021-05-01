@@ -350,7 +350,7 @@ def deepcod_main():
             rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 train_iter.set_description(
-                    f"Train: {epoch:3}. Thresh: {thresh.cpu().item()[0]:.3f},{thresh.cpu().item()[1]:.3f}.  "
+                    f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}.  "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
@@ -402,7 +402,7 @@ def deepcod_main():
             rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 test_iter.set_description(
-                    f" Test: {epoch:3}. Thresh: {thresh.cpu().item()[0]:.3f},{thresh.cpu().item()[1]:.3f}. "
+                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
