@@ -609,8 +609,8 @@ if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
 
-	cco_mobo()
-	# test()
+	# cco_mobo()
+	test()
 
 	# samples for eval
 	# generate_image_samples('ROI')

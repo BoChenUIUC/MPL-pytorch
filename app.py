@@ -505,7 +505,7 @@ def deepcod_main():
 
         # testing
         if epoch%5!=0:continue
-        thresh = torch.FloatTensor([0,0])
+        thresh = torch.FloatTensor([0.1,0])
         if args.device != 'cpu': thresh = thresh.cuda()
         print('Save to', PATH,thresh)
         top1 = AverageMeter()
