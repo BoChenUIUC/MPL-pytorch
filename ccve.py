@@ -581,6 +581,24 @@ def dual_train(net):
 		cgen.optimize(None,True)
 		torch.save(net.state_dict(), PATH)
 
+def cco_mobo(max_iter=20):
+	from app import evaluate_threshold
+	d = {}
+	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
+	d['acc_file'] = open('MOBO_acc.log', "w", 1)
+	d['cr_file'] = open('MOBO_cr.log', "w", 1)
+	def objective(x):
+		acc,cr = evaluate_threshold(x)
+		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
+		d['acc_file'].write(str(acc)+'\n')
+		d['cr_file'].write(str(cr)+'\n')
+		return np.array([acc,cr])
+	Optimizer = mo.MOBayesianOpt(target=objective,
+		NObj=2,
+		pbounds=np.array([[0,0.1],[0,0.1]])) # decided by rough estimate
+	Optimizer.initialize(init_points=5)
+	front, pop = Optimizer.maximize(n_iter=max_iter)
+
 def test():
 	from app import deepcod_main,deepcod_validate
 	deepcod_main()
@@ -591,7 +609,8 @@ if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
 
-	test()
+	cco_mobo()
+	# test()
 
 	# samples for eval
 	# generate_image_samples('ROI')
