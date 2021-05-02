@@ -170,7 +170,11 @@ class LightweightEncoder(nn.Module):
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
 			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
-			rle_len2 = mask_compression(mask_2.view(-1).cpu().numpy())
+			try:
+				rle_len2 = mask_compression(mask_2.view(-1).cpu().numpy())
+			except Exception as e:
+				print(mask_2.view(-1).cpu().numpy())
+			# rle_len2 = mask_compression(mask_2.view(-1).cpu().numpy())
 			real_size += rle_len1 + rle_len2
 			esti_size = torch.count_nonzero(cond_0) + torch.count_nonzero(cond_1)/4 + torch.count_nonzero(cond_2)/16
 			esti_cr = 1/16.*esti_size/(H*W*C*B)

@@ -606,8 +606,8 @@ def test():
 	# disturb_exp()
 
 if __name__ == "__main__":
-	np.random.seed(1234)
-	torch.manual_seed(24)
+	np.random.seed(43)
+	torch.manual_seed(23)
 
 	# cco_mobo()
 	test()
