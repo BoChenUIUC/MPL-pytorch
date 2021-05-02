@@ -217,3 +217,9 @@ class HuffmanCoding:
         print('Decompression Done!')
         end = time.time()
         print(round((end - start), 3), "s")
+
+if __name__ == '__main__':
+    huffman = HuffmanCoding()
+    arr = []
+    size = huffman.compress(arr)
+    print(size)

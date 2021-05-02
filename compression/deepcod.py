@@ -203,6 +203,8 @@ def mask_compression(mask):
 			result += [rl]
 			rl = 0
 		prev = e
+	if rl>0:
+		result += [rl]
 	huffman = HuffmanCoding()
 	size = len(huffman.compress(result))*4
 	return size
