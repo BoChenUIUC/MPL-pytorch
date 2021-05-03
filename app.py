@@ -559,7 +559,7 @@ def deepcod_main():
         #     max_acc = top5.avg
 
 def deepcod_validate():
-    from compression.deepcod import DeepCOD, compute_gradient_penalty
+    from compression.deepcod import DeepCOD
     sim = Simulator(train=False)
 
     # data
