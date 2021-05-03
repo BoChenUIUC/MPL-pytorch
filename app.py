@@ -608,10 +608,8 @@ def deepcod_validate():
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
                     f"real: {real_cr:.4f}. esti: {esti_cr:.4f}")
-            with open("acc.log", "a") as f:
-                f.write(f"{top5.avg:.3f}\n")
-            with open("real_cr.log", "a") as f:
-                f.write(f"{cr.avg:.5f}\n")
+            with open("raw_eval.log", "a") as f:
+                f.write(f"{top5.avg:.3f} {cr.avg:.5f}\n")
 
             test_iter.close()
 

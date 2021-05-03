@@ -601,8 +601,8 @@ def cco_mobo(max_iter=20):
 
 def test():
 	from app import deepcod_main,deepcod_validate
-	deepcod_main()
-	# deepcod_validate()
+	# deepcod_main()
+	deepcod_validate()
 	# disturb_exp()
 
 if __name__ == "__main__":
