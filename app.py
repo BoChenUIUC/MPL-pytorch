@@ -350,7 +350,7 @@ def evaluate_threshold(thresh):
             rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 train_iter.set_description(
-                    f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}.  "
+                    f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}.  "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
@@ -397,7 +397,7 @@ def evaluate_threshold(thresh):
             rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 test_iter.set_description(
-                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
+                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
@@ -427,13 +427,16 @@ def deepcod_main():
     test_loader = sim_test.dataloader
     args = sim_train.opt
     use_subsampling=args.use_subsampling
+    mode = 1 # 0:CCO-R, 1:CCO-A
+    thresh_list = [[0.1]] # for adaptive
 
     # discriminator
     app_model = sim_train.model
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_soft_ss_c8.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/COO-R.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    if use_subsampling and mode==1:PATH = 'backup/CCO-A.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
@@ -448,9 +451,11 @@ def deepcod_main():
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
     
-    for epoch in range(1,501):
-        thresh = torch.rand(2)
-        # thresh = torch.FloatTensor([0.1,0])
+    for epoch in range(1,251):
+        if mode == 0:
+            thresh = torch.rand(2)
+        else:
+            thresh = torch.FloatTensor(thresh_list[epoch%len(thresh_list)])
         if args.device != 'cpu': thresh = thresh.cuda()
         # training
         top1 = AverageMeter()
@@ -507,7 +512,7 @@ def deepcod_main():
         if epoch%5!=0:continue
         thresh = torch.FloatTensor([0.1,0])
         if args.device != 'cpu': thresh = thresh.cuda()
-        print('Save to', PATH,thresh)
+        print('Save to', PATH,thresh,mode)
         top1 = AverageMeter()
         top5 = AverageMeter()
         loss = AverageMeter()
@@ -553,10 +558,12 @@ def deepcod_main():
                     )
 
         test_iter.close()
-        torch.save(gen_model.state_dict(), PATH)
-        # if top5.avg > max_acc:
-        #     torch.save(gen_model.state_dict(), PATH)
-        #     max_acc = top5.avg
+        if mode == 0:
+            torch.save(gen_model.state_dict(), PATH)
+        else:
+            if top5.avg > max_acc:
+                torch.save(gen_model.state_dict(), PATH)
+                max_acc = top5.avg
 
 def deepcod_validate():
     from compression.deepcod import DeepCOD
@@ -565,15 +572,18 @@ def deepcod_validate():
     # data
     test_loader = sim.dataloader
     args = sim.opt
+    use_subsampling=args.use_subsampling
+    mode = 0 # 0:CCO-R, 1:CCO-A
 
     # discriminator
     app_model = sim.model
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/deepcod_soft_ss_c8.pth'
+    PATH = 'backup/CCO-R.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    if use_subsampling and mode==1:PATH = 'backup/CCO-A.pth'
     max_acc = 0
-    gen_model = DeepCOD()
+    gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
@@ -582,80 +592,61 @@ def deepcod_validate():
 
     gen_model.eval()
 
-    for th1 in range(11):
-        for th2 in range(11):
-            thresh = torch.FloatTensor([th1/10.0,th2/10.0])
-            if args.device != 'cpu': thresh = thresh.cuda()
-            top1 = AverageMeter()
-            top5 = AverageMeter()
-            cr = AverageMeter()
-            test_iter = tqdm(test_loader)
-            for step, (images, targets) in enumerate(test_iter):
-                if args.device != 'cpu':
-                    images = images.cuda()
-                    targets = targets.cuda()
+    thresh_list = []
+    if use_subsampling:
+        for th1 in range(11):
+            for th2 in range(11):
+                if mode == 0:
+                    thresh = torch.FloatTensor([th1/10.0,th2/10.0])
+                else:
+                    thresh = torch.FloatTensor([th1/100.0,th2/100.0])
+                thresh_list.append(thresh)
+    else:
+        thresh_list.append(None)
 
-                # generator update
+    for thresh in thresh_list:
+        if args.device != 'cpu': thresh = thresh.cuda()
+        top1 = AverageMeter()
+        top5 = AverageMeter()
+        cr = AverageMeter()
+        test_iter = tqdm(test_loader)
+        for step, (images, targets) in enumerate(test_iter):
+            if args.device != 'cpu':
+                images = images.cuda()
+                targets = targets.cuda()
+
+            # generator update
+            if use_subsampling:
                 recon,res = gen_model((images,thresh))
-                recon_labels = app_model(normalization(recon))
+            else:
+                recon,r = gen_model(images)
+            recon_labels,recon_features = app_model(normalization(recon),True)
+            _,origin_features = app_model(normalization(images),True)
 
-                esti_cr,real_cr,_ = res
-                acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
-                top1.update(acc1[0], targets.shape[0])
-                top5.update(acc5[0], targets.shape[0])
-                cr.update(real_cr)
+            if use_subsampling:
+                _,real_cr,_ = res
+
+            acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
+            top1.update(acc1[0], targets.shape[0])
+            top5.update(acc5[0], targets.shape[0])
+            cr.update(real_cr if use_subsampling else r)
+            if use_subsampling:
                 test_iter.set_description(
+                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
-                    f"Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
-                    f"real: {real_cr:.4f}. esti: {esti_cr:.4f}")
-            with open("raw_eval.log", "a") as f:
-                f.write(f"{top5.avg:.3f} {cr.avg:.5f}\n")
+                    f"cr: {cr.avg:.5f}. "
+                    )
+            else:
+                test_iter.set_description(
+                    f" Test: {epoch:3}. "
+                    f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
+                    f"cr: {cr.avg:.5f}. "
+                    )
+        with open("raw_eval.log" if use_subsampling else "original_eval.log", "a") as f:
+            f.write(f"{top5.avg:.3f} {cr.avg:.5f}\n")
 
-            test_iter.close()
+        test_iter.close()
 
-def deepcod_validate_original():
-    from compression.deepcod import DeepCOD, compute_gradient_penalty
-    sim = Simulator(train=False)
-
-    # data
-    test_loader = sim.dataloader
-    args = sim.opt
-
-    # discriminator
-    app_model = sim.model
-    app_model.eval()
-
-    # encoder+decoder
-    PATH = 'backup/deepcod_soft_c8.pth'
-    max_acc = 0
-    gen_model = DeepCOD(use_subsampling=False)
-    gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
-    if args.device != 'cpu':
-        gen_model = gen_model.cuda()
-
-    normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-
-    gen_model.eval()
-
-    top1 = AverageMeter()
-    top5 = AverageMeter()
-    test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
-    for step, (images, targets) in enumerate(test_iter):
-        if args.device != 'cpu':
-            images = images.cuda()
-            targets = targets.cuda()
-
-        # generator update
-        recon,r = gen_model(images)
-        recon_labels = app_model(normalization(recon))
-
-        acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
-        top1.update(acc1[0], targets.shape[0])
-        top5.update(acc5[0], targets.shape[0])
-        test_iter.set_description(
-            f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. r: {r:.5f}. ")
-
-    test_iter.close()
     # top1: 74.24. top5: 95.76. r: 0.0073.
 
 class Simulator:
