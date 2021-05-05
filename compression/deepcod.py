@@ -122,7 +122,6 @@ class LightweightEncoder(nn.Module):
 		# subsampling
 		# data to be sent: mask + actual data
 		B,C,H,W = x.size()
-		assert(H%2==0 and W%2==0)
 		if self.use_subsampling:
 			th_1 = thresh
 			# sub-sample
@@ -141,7 +140,7 @@ class LightweightEncoder(nn.Module):
 			# affected data in the original shape
 			if not self.training:
 				x = torch.where(cond_1, ss_1, x)
-				print(torch.sum(cond_1),cond_1.size())
+				print(th_1,torch.sum(cond_1),cond_1.size())
 			else:
 				x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
 			
