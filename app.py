@@ -311,7 +311,7 @@ def evaluate_threshold(thresh):
     thresh = torch.FloatTensor(thresh)
     if args.device != 'cpu': thresh = thresh.cuda()
     
-    for epoch in range(1,201):
+    for epoch in range(1,121):
         # training
         top1 = AverageMeter()
         top5 = AverageMeter()
@@ -350,7 +350,7 @@ def evaluate_threshold(thresh):
             rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 train_iter.set_description(
-                    f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}.  "
+                    f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
@@ -453,7 +453,7 @@ def deepcod_main():
     
     for epoch in range(1,251):
         if mode == 0:
-            thresh = torch.rand(2)
+            thresh = torch.rand(1)
         else:
             thresh = torch.FloatTensor(thresh_list[epoch%len(thresh_list)])
         if args.device != 'cpu': thresh = thresh.cuda()
@@ -495,7 +495,7 @@ def deepcod_main():
             rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 train_iter.set_description(
-                    f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}.  "
+                    f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
@@ -510,7 +510,7 @@ def deepcod_main():
 
         # testing
         if epoch%5!=0:continue
-        thresh = torch.FloatTensor([0.1,0])
+        thresh = torch.FloatTensor([0.1])
         if args.device != 'cpu': thresh = thresh.cuda()
         print('Save to', PATH,thresh,mode)
         top1 = AverageMeter()
@@ -556,7 +556,6 @@ def deepcod_main():
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
-
         test_iter.close()
         if mode == 0:
             torch.save(gen_model.state_dict(), PATH)
@@ -595,12 +594,11 @@ def deepcod_validate():
     thresh_list = []
     if use_subsampling:
         for th1 in range(11):
-            for th2 in range(11):
-                if mode == 0:
-                    thresh = torch.FloatTensor([th1/10.0,th2/10.0])
-                else:
-                    thresh = torch.FloatTensor([th1/100.0,th2/100.0])
-                thresh_list.append(thresh)
+            if mode == 0:
+                thresh = torch.FloatTensor([th1/10.0])
+            else:
+                thresh = torch.FloatTensor([th1/100.0])
+            thresh_list.append(thresh)
     else:
         thresh_list.append(None)
 
@@ -632,7 +630,7 @@ def deepcod_validate():
             cr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 test_iter.set_description(
-                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
+                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"cr: {cr.avg:.5f}. "
                     )

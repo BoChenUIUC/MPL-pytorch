@@ -84,23 +84,12 @@ class ContextExtractor(nn.Module):
 
 	def __init__(self):
 		super(ContextExtractor, self).__init__()
-		# self.conv1 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		# self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		# self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		# self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		# self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		# self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		# self.conv2 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
-		# self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 
 	def forward(self, x):
 		x1 = self.conv1(F.relu(self.bn1(x)))
-		# x2 = self.conv2(F.relu(self.bn2(x1)))
-		# x = self.conv3(F.relu(self.bn3(x)))
 		x1 = (torch.tanh(x1)+1)/2
-		# x2 = (torch.tanh(x2)+1)/2
 		return x1
 
 
