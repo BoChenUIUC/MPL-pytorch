@@ -515,7 +515,7 @@ def deepcod_main():
         top5 = AverageMeter()
         loss = AverageMeter()
         rlcr = AverageMeter()
-        # gen_model.eval()
+        gen_model.eval()
         test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
         for step, (images, targets) in enumerate(test_iter):
             if args.device != 'cpu':
@@ -544,7 +544,7 @@ def deepcod_main():
             rlcr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 test_iter.set_description(
-                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f},{thresh.cpu().numpy()[1]:.3f}. "
+                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
@@ -644,6 +644,7 @@ def deepcod_validate():
         test_iter.close()
 
     # top1: 74.24. top5: 95.76. r: 0.0073.
+    # 95.16, 0.00531
 
 class Simulator:
     def __init__(self,train=True,usemodel=True):
