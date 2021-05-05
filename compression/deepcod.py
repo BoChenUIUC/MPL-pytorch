@@ -138,13 +138,10 @@ class LightweightEncoder(nn.Module):
 			data_0 = x[cond_0]
 			comp_data = torch.cat((data_0,data_1),0)
 			# affected data in the original shape
-			# if not self.training:
-			# 	x = torch.where(cond_1, ss_1, x)
-			# 	print(feat_1)
-			# 	print(th_1,torch.sum(cond_1),cond_1.size())
-			# 	exit(0)
-			# else:
-			x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
+			if not self.training:
+				x = torch.where(cond_1, ss_1, x)
+			else:
+				x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
 			
 		# quantization
 		xsize = list(x.size())
