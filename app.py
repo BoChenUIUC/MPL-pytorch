@@ -426,23 +426,16 @@ def deepcod_main():
     test_loader = sim_test.dataloader
     args = sim_train.opt
     use_subsampling=args.use_subsampling
-    mode = 1 # 0:CCO-R, 1:CCO-A
-    thresh_list = [[0.1]] # for adaptive
 
     # discriminator
     app_model = sim_train.model
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/COO-R.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
-    if use_subsampling and mode==1:PATH = 'backup/CCO-A.pth'
+    PATH = 'backup/COO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
-    # gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
-    # if load, no need to save
-    # only the raw model needs to be saved,
-    # rest only need the data
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
 
@@ -450,12 +443,9 @@ def deepcod_main():
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
     
+    thresh = torch.FloatTensor([0.1])
+    if args.device != 'cpu': thresh = thresh.cuda()
     for epoch in range(1,151):
-        if mode == 0:
-            thresh = torch.rand(1)
-        else:
-            thresh = torch.FloatTensor(thresh_list[epoch%len(thresh_list)])
-        if args.device != 'cpu': thresh = thresh.cuda()
         # training
         top1 = AverageMeter()
         top5 = AverageMeter()
@@ -509,9 +499,7 @@ def deepcod_main():
 
         # testing
         if epoch%5!=0:continue
-        thresh = torch.FloatTensor([0.1])
-        if args.device != 'cpu': thresh = thresh.cuda()
-        print('Save to', PATH,thresh,mode)
+        print('Save to', PATH)
         top1 = AverageMeter()
         top5 = AverageMeter()
         loss = AverageMeter()
@@ -536,7 +524,6 @@ def deepcod_main():
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 _,real_cr,_ = res
-                # loss_g += 0.0001*esti_cr - 0.0001*std
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
@@ -556,12 +543,9 @@ def deepcod_main():
                     f"loss: {loss.avg:.3f}. cr: {rlcr.avg:.5f}. "
                     )
         test_iter.close()
-        if mode == 0:
+        if top5.avg > max_acc:
             torch.save(gen_model.state_dict(), PATH)
-        else:
-            if top5.avg > max_acc:
-                torch.save(gen_model.state_dict(), PATH)
-                max_acc = top5.avg
+            max_acc = top5.avg
 
 def deepcod_validate():
     from compression.deepcod import DeepCOD
@@ -571,15 +555,13 @@ def deepcod_validate():
     test_loader = sim.dataloader
     args = sim.opt
     use_subsampling=args.use_subsampling
-    mode = 1 # 0:CCO-R, 1:CCO-A
 
     # discriminator
     app_model = sim.model
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-R.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
-    if use_subsampling and mode==1:PATH = 'backup/CCO-A.pth'
+    PATH = 'backup/CCO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
@@ -592,14 +574,9 @@ def deepcod_validate():
 
     thresh_list = []
     if use_subsampling:
-        if mode == 0:
-            for th1 in range(11):
-                thresh = torch.FloatTensor([th1/10.0])
-                thresh_list.append(thresh)
-        else:
-            for th1 in range(0,11):
-                thresh = torch.FloatTensor([th1/10.0])
-                thresh_list.append(thresh)
+        for th1 in range(0,11):
+            thresh = torch.FloatTensor([th1/10.0])
+            thresh_list.append(thresh)
     else:
         thresh_list.append(None)
 
