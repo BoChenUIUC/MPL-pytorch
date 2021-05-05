@@ -140,7 +140,9 @@ class LightweightEncoder(nn.Module):
 			# affected data in the original shape
 			if not self.training:
 				x = torch.where(cond_1, ss_1, x)
+				print(feat_1)
 				print(th_1,torch.sum(cond_1),cond_1.size())
+				exit(0)
 			else:
 				x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
 			
