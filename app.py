@@ -363,6 +363,7 @@ def evaluate_threshold(thresh):
 
         # testing
         if epoch%5!=0:continue
+        gen_model.eval()
         top1 = AverageMeter()
         top5 = AverageMeter()
         loss = AverageMeter()
@@ -570,7 +571,7 @@ def deepcod_validate():
     test_loader = sim.dataloader
     args = sim.opt
     use_subsampling=args.use_subsampling
-    mode = 0 # 0:CCO-R, 1:CCO-A
+    mode = 1 # 0:CCO-R, 1:CCO-A
 
     # discriminator
     app_model = sim.model
@@ -595,7 +596,7 @@ def deepcod_validate():
             if mode == 0:
                 thresh = torch.FloatTensor([th1/10.0])
             else:
-                thresh = torch.FloatTensor([th1/100.0])
+                thresh = torch.FloatTensor([th1/10.0])
             thresh_list.append(thresh)
     else:
         thresh_list.append(None)
