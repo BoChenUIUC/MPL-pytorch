@@ -310,7 +310,6 @@ def evaluate_threshold(thresh):
 
     thresh = torch.FloatTensor(thresh)
     if args.device != 'cpu': thresh = thresh.cuda()
-    
     for epoch in range(1,121):
         # training
         top1 = AverageMeter()
@@ -368,7 +367,6 @@ def evaluate_threshold(thresh):
         top5 = AverageMeter()
         loss = AverageMeter()
         rlcr = AverageMeter()
-        # gen_model.eval()
         test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
         for step, (images, targets) in enumerate(test_iter):
             if args.device != 'cpu':
