@@ -481,8 +481,8 @@ def deepcod_main():
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
-                esti_cr,real_cr,std = res
-                # loss_g += 0.0001*esti_cr - 0.0001*std
+                filter_loss,real_cr,entropy = res
+                loss_g += 0.001*filter_loss + 0.0001* entropy
             
             loss_g.backward()
             optimizer_g.step()
