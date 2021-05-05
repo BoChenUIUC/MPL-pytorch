@@ -631,13 +631,12 @@ def deepcod_validate():
             cr.update(real_cr if use_subsampling else r)
             if use_subsampling:
                 test_iter.set_description(
-                    f" Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
+                    f" Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"cr: {cr.avg:.5f}. "
                     )
             else:
                 test_iter.set_description(
-                    f" Test: {epoch:3}. "
                     f"top1: {top1.avg:.2f}. top5: {top5.avg:.2f}. "
                     f"cr: {cr.avg:.5f}. "
                     )
