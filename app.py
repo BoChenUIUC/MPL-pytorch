@@ -450,7 +450,7 @@ def deepcod_main():
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
     
-    for epoch in range(1,251):
+    for epoch in range(1,151):
         if mode == 0:
             thresh = torch.rand(1)
         else:
@@ -592,12 +592,14 @@ def deepcod_validate():
 
     thresh_list = []
     if use_subsampling:
-        for th1 in range(11):
-            if mode == 0:
+        if mode == 0:
+            for th1 in range(11):
                 thresh = torch.FloatTensor([th1/10.0])
-            else:
-                thresh = torch.FloatTensor([th1/10.0])
-            thresh_list.append(thresh)
+                thresh_list.append(thresh)
+        else:
+            for th1 in range(101):
+                thresh = torch.FloatTensor([th1/100.0])
+                thresh_list.append(thresh)
     else:
         thresh_list.append(None)
 

@@ -160,20 +160,13 @@ class LightweightEncoder(nn.Module):
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
 			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
-			# try:
-			# 	rle_len2 = mask_compression(mask_2.view(-1).cpu().numpy())
-			# except Exception as e:
-			# 	print(mask_2.view(-1).cpu().numpy())
-			real_size += rle_len1 #+ rle_len2
-			esti_size = torch.count_nonzero(cond_0) + torch.count_nonzero(cond_1)/4 #+ torch.count_nonzero(cond_2)/16
-			esti_cr = 1/16.*esti_size/(H*W*C*B)
+			real_size += rle_len1
+			filter_loss = torch.mean(feat_1)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
-			index = index.view(-1).unsqueeze(-1)
-			index_nums = torch.arange(0, 8).cuda()
-			counts = torch.sum(index==index_nums,dim=0)
-			counts = counts/torch.sum(counts)
-			std = torch.std(counts)
-			return x,(esti_cr,real_cr,std)
+			softmax_dist = nn.functional.softmax(-quant_dist, dim=-1)
+			soft_prob = torch.mean(softmax_dist,dim=0)
+			entropy = -torch.sum(torch.mul(soft_prob,torch.log(soft_prob)))
+			return x,(filter_loss,real_cr,entropy)
 		else:
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
