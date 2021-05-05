@@ -598,7 +598,7 @@ def deepcod_validate():
                 thresh_list.append(thresh)
         else:
             for th1 in range(0,11):
-                thresh = torch.FloatTensor([th1/100.0])
+                thresh = torch.FloatTensor([th1/10.0])
                 thresh_list.append(thresh)
     else:
         thresh_list.append(None)
