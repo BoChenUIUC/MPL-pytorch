@@ -472,7 +472,7 @@ def deepcod_main():
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 filter_loss,real_cr,entropy = res
-                loss_g += 0.01*filter_loss# + 0.0001* entropy
+                loss_g += 0.001*filter_loss + 0.0001* entropy
             
             loss_g.backward()
             optimizer_g.step()
@@ -597,7 +597,7 @@ def deepcod_validate():
             else:
                 recon,r = gen_model(images)
             recon_labels,recon_features = app_model(normalization(recon),True)
-            _,origin_features = app_model(normalization(images),True)
+            # _,origin_features = app_model(normalization(images),True)
 
             if use_subsampling:
                 _,real_cr,_ = res
