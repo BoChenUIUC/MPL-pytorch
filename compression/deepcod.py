@@ -84,7 +84,7 @@ class ContextExtractor(nn.Module):
 
 	def __init__(self):
 		super(ContextExtractor, self).__init__()
-		self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
+		self.conv1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 
 	def forward(self, x):
@@ -114,15 +114,15 @@ class LightweightEncoder(nn.Module):
 		# sample from input
 		if self.use_subsampling:
 			x,thresh = x
-			# feature 
-			feat_1 = self.ctx(x)
-			feat_1_ = self.unpool(feat_1)
 		x = self.sample(x)
 
 		# subsampling
 		# data to be sent: mask + actual data
 		B,C,H,W = x.size()
 		if self.use_subsampling:
+			# feature 
+			feat_1 = self.ctx(x)
+			feat_1_ = self.unpool(feat_1)
 			th_1 = thresh
 			# sub-sample
 			ss_1 = self.unpool(self.pool1(x))
