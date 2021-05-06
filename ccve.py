@@ -592,7 +592,7 @@ def test():
 	acc_file = open('acc.log', "w", 1)
 	cr_file = open('cr.log', "w", 1)
 	for cfg in cfgs:
-		acc,cr = evaluate_config(*x)
+		acc,cr = evaluate_config(*cfg)
 		cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
 		acc_file.write(str(acc)+'\n')
 		cr_file.write(str(cr)+'\n')
