@@ -432,7 +432,7 @@ def deepcod_main():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/COO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
