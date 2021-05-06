@@ -291,6 +291,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
     train_loader = sim_train.dataloader
     test_loader = sim_test.dataloader
     args = sim_train.opt
+    use_subsampling = True
 
     # discriminator
     app_model = sim_train.model
@@ -298,7 +299,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
 
     # encoder+decoder
     max_acc,max_cr = 0,0
-    gen_model = DeepCOD(use_subsampling=True)
+    gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
