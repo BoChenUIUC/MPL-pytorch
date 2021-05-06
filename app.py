@@ -336,8 +336,8 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
-                esti_cr,real_cr,std = res
-                loss_g += gamma1*esti_cr - gamma2*std
+                filter_loss,real_cr,entropy = res
+                loss_g += gamma1*filter_loss + gamma2* entropy
             
             loss_g.backward()
             optimizer_g.step()
@@ -387,7 +387,6 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 _,real_cr,_ = res
-                loss_g += gamma1*esti_cr - gamma2*std
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))
