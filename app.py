@@ -282,7 +282,7 @@ def plot(samples):
         plt.imshow(sample)
     return fig
 
-def evaluate_threshold(thresh):
+def evaluate_config(gamma1=0.0001,gamma2=0.0001):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True)
     sim_test = Simulator(train=False,usemodel=False)
@@ -291,7 +291,6 @@ def evaluate_threshold(thresh):
     train_loader = sim_train.dataloader
     test_loader = sim_test.dataloader
     args = sim_train.opt
-    use_subsampling=args.use_subsampling
 
     # discriminator
     app_model = sim_train.model
@@ -299,7 +298,7 @@ def evaluate_threshold(thresh):
 
     # encoder+decoder
     max_acc,max_cr = 0,0
-    gen_model = DeepCOD(use_subsampling=use_subsampling)
+    gen_model = DeepCOD(use_subsampling=True)
     gen_model.apply(init_weights)
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
@@ -308,9 +307,9 @@ def evaluate_threshold(thresh):
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
 
-    thresh = torch.FloatTensor(thresh)
+    thresh = torch.FloatTensor([0.5])
     if args.device != 'cpu': thresh = thresh.cuda()
-    for epoch in range(1,121):
+    for epoch in range(1,101):
         # training
         top1 = AverageMeter()
         top5 = AverageMeter()
@@ -337,7 +336,7 @@ def evaluate_threshold(thresh):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 esti_cr,real_cr,std = res
-                # loss_g += 0.0001*esti_cr - 0.0001*std
+                loss_g += gamma1*esti_cr - gamma2*std
             
             loss_g.backward()
             optimizer_g.step()
@@ -387,7 +386,7 @@ def evaluate_threshold(thresh):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 _,real_cr,_ = res
-                # loss_g += 0.0001*esti_cr - 0.0001*std
+                loss_g += gamma1*esti_cr - gamma2*std
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))

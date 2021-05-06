@@ -581,35 +581,26 @@ def dual_train(net):
 		cgen.optimize(None,True)
 		torch.save(net.state_dict(), PATH)
 
-def cco_mobo(max_iter=25):
-	from app import evaluate_threshold
-	d = {}
-	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
-	d['acc_file'] = open('MOBO_acc.log', "w", 1)
-	d['cr_file'] = open('MOBO_cr.log', "w", 1)
-	def objective(x):
-		acc,cr = evaluate_threshold(x)
-		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
-		d['acc_file'].write(str(acc)+'\n')
-		d['cr_file'].write(str(cr)+'\n')
-		return np.array([acc,cr])
-	Optimizer = mo.MOBayesianOpt(target=objective,
-		NObj=2,
-		pbounds=np.array([[0,0.15]])) # decided by rough estimate
-	Optimizer.initialize(init_points=5)
-	front, pop = Optimizer.maximize(n_iter=max_iter)
-
 def test():
 	from app import deepcod_main,deepcod_validate
-	deepcod_main()
+	# deepcod_main()
 	# deepcod_validate()
-	# disturb_exp()
+	from app import evaluate_config
+	cfgs = [[0.0001,0.0001],[0.001,0.0001],[0.01,0.0001],[0.1,0.0001],[1,0.0001],\
+			[0.01,0.001],[0.01,0.01],[0.01,0.1],[0.01,1]]
+	cfg_file = open('cfg.log', "w", 1)
+	acc_file = open('acc.log', "w", 1)
+	cr_file = open('cr.log', "w", 1)
+	for cfg in cfgs:
+		acc,cr = evaluate_config(*x)
+		cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
+		acc_file.write(str(acc)+'\n')
+		cr_file.write(str(cr)+'\n')
 
 if __name__ == "__main__":
 	np.random.seed(43)
 	torch.manual_seed(23)
 
-	# cco_mobo()
 	test()
 
 	# samples for eval
