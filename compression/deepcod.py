@@ -143,8 +143,8 @@ class LightweightEncoder(nn.Module):
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
 		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
 		hardout = torch.sum(self.centers * (minval == quant_dist), dim=-1)
-		# x = softout
-		x = softout + (hardout - softout).detach()
+		x = softout
+		# x = softout + (hardout - softout).detach()
 		if self.use_subsampling:
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
@@ -208,7 +208,7 @@ def init_weights(m):
 
 class DeepCOD(nn.Module):
 
-	def __init__(self, kernel_size=4, num_centers=64, use_subsampling=True):
+	def __init__(self, kernel_size=4, num_centers=8, use_subsampling=True):
 		super(DeepCOD, self).__init__()
 		out_size = 3
 		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=num_centers, use_subsampling=use_subsampling)
