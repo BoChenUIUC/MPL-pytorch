@@ -143,8 +143,8 @@ class LightweightEncoder(nn.Module):
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
 		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
 		hardout = torch.sum(self.centers * (minval == quant_dist), dim=-1)
-		# x = softout
-		x = softout + (hardout - softout).detach()
+		x = softout
+		# x = softout + (hardout - softout).detach()
 		if self.use_subsampling:
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
