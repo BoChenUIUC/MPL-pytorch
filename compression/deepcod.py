@@ -92,7 +92,6 @@ class ContextExtractor(nn.Module):
 		x1 = (torch.tanh(x1)+1)/2
 		return x1
 
-
 class LightweightEncoder(nn.Module):
 
 	def __init__(self, channels, kernel_size=4, num_centers=8, use_subsampling=True):
@@ -100,10 +99,7 @@ class LightweightEncoder(nn.Module):
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
 		self.centers = torch.nn.Parameter(torch.rand(num_centers))
-		# self.pool1 = nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
-		# self.pool2 = nn.AvgPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
 		self.pool1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
-		# self.pool2 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
 		if use_subsampling:
@@ -126,12 +122,9 @@ class LightweightEncoder(nn.Module):
 			th_1 = thresh
 			# sub-sample
 			ss_1 = self.unpool(self.pool1(x))
-			# ss_2 = self.unpool(self.unpool(self.pool2(self.pool1(x))))
 			# conditions
-			# cond_2 = feat_2_<th_2
 			cond_1 = feat_1_<th_1
 			mask_1 = feat_1<th_1
-			# mask_2 = feat_2<th_2
 			# subsampled data in different areas
 			data_1 = self.pool1(x)[mask_1]
 			cond_0 = torch.logical_not(cond_1)
@@ -150,7 +143,8 @@ class LightweightEncoder(nn.Module):
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
 		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
 		hardout = torch.sum(self.centers * (minval == quant_dist), dim=-1)
-		x = softout
+		# x = softout
+		x = softout + (hardout - softout).detach()
 		if self.use_subsampling:
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
@@ -236,12 +230,30 @@ class DeepCOD(nn.Module):
 		
 		return x,r
 
+
+class STE(nn.Module):
+
+	def __init__(self):
+		super(STE, self).__init__()
+		self.centers = torch.nn.Parameter(torch.rand(2))
+
+	def forward(self, x):
+		xsize = list(x.size())
+		x = x.view(*(xsize + [1]))
+		quant_dist = torch.pow(x-self.centers, 2)
+		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
+		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
+		hardout = torch.sum(self.centers * (minval == quant_dist), dim=-1)
+		tmp = hardout - softout
+		# return softout + (hardout - softout).detach()
+		return hardout
+
 if __name__ == '__main__':
-	image = torch.randn(1,3,32,32)
-	model = DeepCOD()
-	output,r = model((image,(.5,0)))
+	# image = torch.randn(1,3,32,32)
+	# model = DeepCOD()
+	# output,r = model((image,(.5,0)))
 	# print(model)
-	print(r)
+	# print(r)
 	# print(output.shape)
 	# weight = torch.diag(torch.ones(4)).repeat(3,3,1,1)
 	# print(weight.size())
@@ -251,3 +263,12 @@ if __name__ == '__main__':
 	# for name, param in model.named_parameters():
 	# 	print('name is {}'.format(name))
 	# 	print('shape is {}'.format(param.shape))
+	# torch.manual_seed(1)
+	x = torch.randn(1,3)
+	print(x)
+	net = STE()
+	y = net(x)
+	loss = y.mean()
+	loss.backward()
+	print(net.centers)
+	print(net.centers.grad)
