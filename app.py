@@ -674,7 +674,6 @@ def disturb_exp():
         if args.device != 'cpu':
             images = images.cuda()
             targets = targets.cuda()
-        if step == 1:break
 
         B,C,H,W = images.size()
 
