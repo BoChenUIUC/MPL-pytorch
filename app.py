@@ -431,7 +431,7 @@ def deepcod_main():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO-shared.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
@@ -444,7 +444,7 @@ def deepcod_main():
     
     thresh = torch.FloatTensor([0.1])
     if args.device != 'cpu': thresh = thresh.cuda()
-    for epoch in range(1,151):
+    for epoch in range(1,101):
         # training
         top1 = AverageMeter()
         top5 = AverageMeter()

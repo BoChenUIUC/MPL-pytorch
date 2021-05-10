@@ -696,12 +696,12 @@ def JPEG2000(npimg,C_param):
 	tmp_dir = comp_dir + 'tmp/'
 	cv2.imwrite(tmp_dir+'origin.png',npimg)
 	osize = os.stat(tmp_dir+'origin.png').st_size
-	start = time.perf_counter()
 	comp_cmd = './'+comp_dir+'opj_compress -i '+tmp_dir+'origin.png -o '+tmp_dir+'compressed.j2k -r '+str(C_param)
 	subprocess.call(comp_cmd, shell=True)
-	end = time.perf_counter()
+	start = time.perf_counter()
 	decm_cmd = './'+comp_dir+'opj_decompress -i '+tmp_dir+'compressed.j2k -o '+tmp_dir+'decompressed.png -r '+str(C_param)
 	subprocess.call(decm_cmd, shell=True)
+	end = time.perf_counter()
 	lossy_image = cv2.imread(tmp_dir+'decompressed.png')
 	assert(lossy_image is not None)
 	lossy_image = cv2.resize(lossy_image, dsize=(npimg.shape[1],npimg.shape[0]), interpolation=cv2.INTER_LINEAR)

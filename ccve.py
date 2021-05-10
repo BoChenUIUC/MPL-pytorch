@@ -582,12 +582,12 @@ def dual_train(net):
 		torch.save(net.state_dict(), PATH)
 
 def test():
-	from app import deepcod_main,deepcod_validate
+	# from app import deepcod_main,deepcod_validate
 	# deepcod_main()
 	# deepcod_validate()
 	from app import evaluate_config
 	# 0.01,0.0001
-	cfgs = [[0,0.0001],[1,0.0001]]
+	cfgs = [[0.1,0.0001]]
 	cfg_file = open('cfg.log', "w", 1)
 	acc_file = open('acc.log', "w", 1)
 	cr_file = open('cr.log', "w", 1)
