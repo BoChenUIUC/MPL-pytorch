@@ -658,11 +658,6 @@ def disturb_exp():
     cor1 = AverageMeter()
     cor2 = AverageMeter()
     for step, (images, targets) in enumerate(test_iter):
-        if args.device != 'cpu':
-            images = images.cuda()
-            targets = targets.cuda()
-        if step == 1:break
-
         if TF is not None:
             feature_maps = None
             for th_img in images:
@@ -676,6 +671,10 @@ def disturb_exp():
             # fig = plot(feature_maps)
             # plt.savefig(f'samples/feature_map_{step:1}.png', bbox_inches='tight')
             # plt.close(fig)
+        if args.device != 'cpu':
+            images = images.cuda()
+            targets = targets.cuda()
+        if step == 1:break
 
         B,C,H,W = images.size()
 
