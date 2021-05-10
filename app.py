@@ -624,6 +624,116 @@ def deepcod_validate():
     # top1: 74.24. top5: 95.76. r: 0.0073.
     # 95.16, 0.00531
 
+def disturb_exp():
+    from compression.deepcod import DeepCOD
+    sim = Simulator(train=False)
+    # data
+    test_loader = sim.dataloader
+    args = sim.opt
+    # discriminator
+    app_model = sim.model
+    app_model.eval()
+    # encoder+decoder
+    PATH = 'backup/deepcod_soft_c8.pth'
+    max_acc = 0
+    gen_model = DeepCOD(use_subsampling=False)
+    d = torch.load(PATH,map_location='cpu')
+    # for k in d.keys():
+    #     if 'encoder' in k:
+    #         print(k)
+    gen_model.load_state_dict(d)
+    if args.device != 'cpu':
+        gen_model = gen_model.cuda()
+    # print(gen_model.encoder.centers.data)
+    # exit(0)
+    normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+    gen_model.eval()
+    test_iter = tqdm(test_loader, disable=args.local_rank not in [-1, 0])
+    toMacroBlock = nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
+    criterion_ce = nn.CrossEntropyLoss()
+    from compression.transformer import Transformer
+    TF = Transformer('FeatureMap')
+    TF.reset()
+    C_param = None
+    cor1 = AverageMeter()
+    cor2 = AverageMeter()
+    for step, (images, targets) in enumerate(test_iter):
+        if args.device != 'cpu':
+            images = images.cuda()
+            targets = targets.cuda()
+        if step == 1:break
+
+        if TF is not None:
+            feature_maps = None
+            for th_img in images:
+                np_img = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+                tf_img = TF.transform(image=np_img, C_param=C_param)
+                tf_img = torch.from_numpy(tf_img).float().unsqueeze(0)
+                if feature_maps is None:
+                    feature_maps = tf_img
+                else:
+                    feature_maps = torch.cat((feature_maps,tf_img),0)
+            # fig = plot(feature_maps)
+            # plt.savefig(f'samples/feature_map_{step:1}.png', bbox_inches='tight')
+            # plt.close(fig)
+
+        B,C,H,W = images.size()
+
+        feature_arr = feature_maps.view(-1).data.cpu().numpy()
+        # magics
+        X = Variable(images,requires_grad=True) 
+        # raw = images.data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
+        # fig = plot(raw)
+        # plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
+        # plt.close(fig)
+        recon,_ = gen_model(X)
+        recon_labels = app_model(normalization(recon))
+        loss = criterion_ce(recon_labels, targets)
+        gradients = torch.autograd.grad(outputs=loss, inputs=X,
+                                grad_outputs=torch.ones(loss.size()),
+                              create_graph=True, retain_graph=False, only_inputs=True)[0]
+        impact = torch.norm(gradients.data, dim=1)
+        impact = toMacroBlock(impact).view(B,-1)
+        # impact = F.softmax(impact.view(B,-1),dim=-1)
+        samples = impact.view(B,H//8,W//8).data.cpu().numpy()
+        impact_arr = impact.view(-1).data.cpu().numpy()
+        # fig = plot(samples)
+        # plt.savefig(f'samples/impact_{step:1}.png', bbox_inches='tight')
+        # plt.close(fig)
+        # save to file
+        # loss map
+        base_loss = loss.cpu().item()
+        assert(H%8==0 and W%8==0)
+        ss_map = torch.zeros(B,C,H//8,W//8)
+        loss_map = torch.zeros(B,H//8,W//8)
+        for b in range(B):
+            for h in range(H//8):
+                for w in range(W//8):
+                    ss_map[b,:,h,w] = 1
+                    recon,_ = gen_model(images,ss_map=ss_map)
+                    recon_labels = app_model(normalization(recon))
+                    loss = criterion_ce(recon_labels, targets)
+                    _, acc5 = accuracy(recon_labels, targets, (1, 5))
+                    loss_map[b,h,w] = loss.cpu().item() - base_loss
+                    ss_map[b,:,h,w] = 0
+        loss_arr = loss_map.view(-1).data.cpu().numpy()
+        # samples = loss_map.data.cpu().numpy()
+        # fig = plot(samples)
+        # plt.savefig(f'samples/loss_map_{step:1}.png', bbox_inches='tight')
+        # plt.close(fig)
+        # print(feature_arr,loss_arr,impact_arr)
+        loss_arr = (loss_arr-np.mean(loss_arr))/np.std(loss_arr)/len(loss_arr)
+        feature_arr = (feature_arr-np.mean(feature_arr))/np.std(feature_arr)
+        impact_arr = (impact_arr-np.mean(impact_arr))/np.std(impact_arr)
+        # print(loss_arr,feature_arr,impact_arr)
+        cor1.update(np.correlate(loss_arr,feature_arr))
+        cor2.update(np.correlate(impact_arr,loss_arr))
+        test_iter.set_description(
+            f"Cor1: {cor1.avg:.4f}. "
+            f"Cor2: {cor2.avg:.4f}. "
+            )
+    test_iter.close()
+
 class Simulator:
     def __init__(self,train=True,usemodel=True):
         self.opt = setup_opt()

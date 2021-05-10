@@ -438,6 +438,20 @@ def quality2image(image, quality, jpeg):
 	bgr_frame = jpeg.decode(jpegraw,feature_encoding)
 	return bgr_frame,original_size,compressed_size
 
+def feature_map(image, C_param):
+	bgr_frame = np.array(image)
+	bgr_frame = np.ascontiguousarray(bgr_frame)
+
+	features = get_SIFT(bgr_frame)
+	img_h,img_w = bgr_frame.shape[:2]
+
+	gridx = [i for i in range(0,img_w,8)] + [img_w]
+	gridy = [i for i in range(0,img_h,8)] + [img_h]
+	feature_x = [p[0] for p in features]
+	feature_y = [p[1] for p in features]
+	grid, _, _ = np.histogram2d(feature_x, feature_y, bins=[gridx, gridy])
+	return grid.T,0,0,0
+
 def tile_encoder(image, C_param, jpeg, counter, snapshot=False, rand=False):
 	start = time.perf_counter()
 	toSave = snapshot and counter<16
@@ -821,6 +835,8 @@ class Transformer:
 			rimage,osize,csize,t = ROI_encoder(image, C_param, self.jpeg, self.counter, self.snapshot)
 		elif self.name == 'Scale':
 			rimage,osize,csize,t = tile_scaler(image, C_param)
+		elif self.name == 'FeatureMap':
+			rimage,osize,csize,t = feature_map(image, C_param)
 		else:
 			print(self.name,'not implemented.')
 			exit(1)

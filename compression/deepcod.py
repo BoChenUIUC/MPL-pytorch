@@ -84,19 +84,19 @@ class ContextExtractor(nn.Module):
 
 	def __init__(self):
 		super(ContextExtractor, self).__init__()
-		# self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
-		# self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv1 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		# self.conv1 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		# self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		# self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		# self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		# self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
+		# self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 
 	def forward(self, x):
 		x = self.conv1(F.relu(self.bn1(x)))
-		x = self.conv2(F.relu(self.bn2(x)))
-		x = self.conv3(F.relu(self.bn3(x)))
+		# x = self.conv2(F.relu(self.bn2(x)))
+		# x = self.conv3(F.relu(self.bn3(x)))
 		x = (torch.tanh(x)+1)/2
 		return x
 
@@ -107,14 +107,15 @@ class LightweightEncoder(nn.Module):
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
 		self.centers = torch.nn.Parameter(torch.rand(num_centers))
-		self.pool1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
+		self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
 		if use_subsampling:
+			self.pool1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
 			self.ctx = ContextExtractor()
 		self.use_subsampling = use_subsampling
 
-	def forward(self, x):
+	def forward(self, x, ss_map=None):
 		# sample from input
 		if self.use_subsampling:
 			x,thresh = x
@@ -122,6 +123,12 @@ class LightweightEncoder(nn.Module):
 			feat_1 = self.ctx(x)
 			feat_1_ = self.unpool(feat_1)
 		x = self.sample(x)
+
+		if ss_map is not None:
+			ss_map = self.unpool(ss_map)>0.5
+			unpooled = self.unpool(self.pool(x))
+			x = torch.where(ss_map, unpooled, x)
+
 
 		# subsampling
 		# data to be sent: mask + actual data
@@ -226,8 +233,8 @@ class DeepCOD(nn.Module):
 		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
-	def forward(self, x):
-		x,r = self.encoder(x)
+	def forward(self, x, ss_map=None):
+		x,r = self.encoder(x,ss_map=ss_map)
 
 		# reconstruct
 		x = self.attention_1(x)
