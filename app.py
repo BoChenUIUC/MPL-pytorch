@@ -727,6 +727,7 @@ def disturb_exp():
         # print(loss_arr,feature_arr,impact_arr)
         cor1.update(np.correlate(loss_arr,feature_arr))
         cor2.update(np.correlate(impact_arr,loss_arr))
+        print(cor1.avg,cor2.avg)
         test_iter.set_description(
             f"Cor1: {cor1.avg:.4f}. "
             f"Cor2: {cor2.avg:.4f}. "
