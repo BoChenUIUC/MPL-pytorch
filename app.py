@@ -703,7 +703,7 @@ def disturb_exp():
         # loss map
         base_loss = loss.cpu().item()
         assert(H%8==0 and W%8==0)
-        ss_map = torch.zeros(B,C,H//8,W//8)
+        ss_map = torch.zeros(B,C,H//8,W//8).cuda()
         loss_map = torch.zeros(B,H//8,W//8)
         for b in range(B):
             for h in range(H//8):
