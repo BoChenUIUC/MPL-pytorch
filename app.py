@@ -424,14 +424,14 @@ def deepcod_main():
     train_loader = sim_train.dataloader
     test_loader = sim_test.dataloader
     args = sim_train.opt
-    use_subsampling=args.use_subsampling
+    use_subsampling=True
 
     # discriminator
     app_model = sim_train.model
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-shared.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
