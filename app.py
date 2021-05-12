@@ -435,7 +435,6 @@ def deepcod_main():
     PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     print(PATH,gamma1,gamma2,lr,thresh)
 
-
     # discriminator
     app_model = sim_train.model
     app_model.eval()
@@ -567,7 +566,7 @@ def deepcod_validate():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-A-second.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO-A-best.pth' if use_subsampling else 'backup/deepcod_soft_c8_best.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
