@@ -567,7 +567,7 @@ def deepcod_validate():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO-A-best.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
@@ -579,12 +579,8 @@ def deepcod_validate():
     gen_model.eval()
 
     thresh_list = []
-    if use_subsampling:
-        for th1 in range(0,11):
-            thresh = torch.FloatTensor([th1/10.0])
-            thresh_list.append(thresh)
-    else:
-        thresh_list.append(None)
+    thresh = torch.FloatTensor([0.5])
+    thresh_list.append(thresh)
 
     for thresh in thresh_list:
         if args.device != 'cpu': thresh = thresh.cuda()
