@@ -584,8 +584,8 @@ def dual_train(net):
 def test():
 	from app import deepcod_main,deepcod_validate,disturb_exp
 	# disturb_exp()
-	# deepcod_main()
-	deepcod_validate()
+	deepcod_main()
+	# deepcod_validate()
 	# from app import evaluate_config
 	# # 0.01,0.0001
 	# cfgs = [[0.1,0.0001]]
