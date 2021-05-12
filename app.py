@@ -426,12 +426,21 @@ def deepcod_main():
     args = sim_train.opt
     use_subsampling=args.use_subsampling
 
+    # settings
+    gamma1 = 0.01
+    gamma2 = 0.0001
+    lr = 0.0001
+    thresh = torch.FloatTensor([0.5])
+    if args.device != 'cpu': thresh = thresh.cuda()
+    PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    print(PATH,gamma1,gamma2,lr,thresh)
+
+
     # discriminator
     app_model = sim_train.model
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
@@ -439,11 +448,8 @@ def deepcod_main():
         gen_model = gen_model.cuda()
 
     criterion_mse = nn.MSELoss()
-    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
+    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=lr, betas=(0,0.9))
     normalization = transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
-    
-    thresh = torch.FloatTensor([0.1])
-    if args.device != 'cpu': thresh = thresh.cuda()
     for epoch in range(1,101):
         # training
         top1 = AverageMeter()
@@ -471,7 +477,7 @@ def deepcod_main():
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
                 filter_loss,real_cr,entropy = res
-                loss_g += 0.01*filter_loss + 0.0001* entropy
+                loss_g += gamma1*filter_loss + gamma2* entropy
             
             loss_g.backward()
             optimizer_g.step()
@@ -522,7 +528,8 @@ def deepcod_main():
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 loss_g += criterion_mse(origin_feat,recon_feat)
             if use_subsampling:
-                _,real_cr,_ = res
+                filter_loss,real_cr,entropy = res
+                loss_g += gamma1*filter_loss + gamma2* entropy
 
             loss.update(loss_g.cpu().item())
             acc1, acc5 = accuracy(recon_labels, targets, (1, 5))

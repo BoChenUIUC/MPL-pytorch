@@ -129,7 +129,6 @@ class LightweightEncoder(nn.Module):
 			unpooled = self.unpool(self.pool(x))
 			x = torch.where(ss_map, unpooled, x)
 
-
 		# subsampling
 		# data to be sent: mask + actual data
 		B,C,H,W = x.size()
@@ -157,17 +156,21 @@ class LightweightEncoder(nn.Module):
 		quant_dist = torch.pow(x-self.centers, 2)
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
 		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
+		# print('idx',index.view(-1).size())
 		hardout = torch.sum(self.centers * (minval == quant_dist), dim=-1)
 		x = softout
 		# x = softout + (hardout - softout).detach()
 		if self.use_subsampling:
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
-			index = torch.min(quant_dist, dim=-1, keepdim=True)[1]
+			index2 = torch.min(quant_dist, dim=-1, keepdim=True)[1]
+			# print('idx2',index2.view(-1).size())
 			# running length coding on bitmap
 			huffman = HuffmanCoding()
-			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
+			real_size = len(huffman.compress(index2.view(-1).cpu().numpy())) * 4 # bit
 			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
+			test = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
+			# print('CCO',real_size,rle_len1,test)
 			real_size += rle_len1
 			filter_loss = torch.mean(feat_1)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
@@ -178,6 +181,7 @@ class LightweightEncoder(nn.Module):
 		else:
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
+			# print('deepcod',real_size)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			return x,real_cr
 
