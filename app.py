@@ -424,7 +424,7 @@ def deepcod_main():
     train_loader = sim_train.dataloader
     test_loader = sim_test.dataloader
     args = sim_train.opt
-    use_subsampling=True
+    use_subsampling=opt.use_subsampling
 
     # discriminator
     app_model = sim_train.model
