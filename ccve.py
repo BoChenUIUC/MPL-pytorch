@@ -581,11 +581,29 @@ def dual_train(net):
 		cgen.optimize(None,True)
 		torch.save(net.state_dict(), PATH)
 
+def cco_mobo(max_iter=25):
+	from app import evaluate_config
+	d = {}
+	d['cfg_file'] = open('cfg.log', "w", 1)
+	d['acc_file'] = open('acc.log', "w", 1)
+	d['cr_file'] = open('cr.log', "w", 1)
+	def objective(x):
+		acc,cr = evaluate_config(*x)
+		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
+		d['acc_file'].write(str(acc)+'\n')
+		d['cr_file'].write(str(cr)+'\n')
+		return np.array([acc,cr])
+	Optimizer = mo.MOBayesianOpt(target=objective,
+		NObj=2,
+		pbounds=np.array([[0,1],[0,1]])) # decided by rough estimate
+	Optimizer.initialize(init_points=5)
+	front, pop = Optimizer.maximize(n_iter=max_iter)
+
 def test():
 	from app import deepcod_main,deepcod_validate,disturb_exp
 	# disturb_exp()
-	deepcod_main()
-	# deepcod_validate()
+	# deepcod_main()
+	deepcod_validate()
 	# from app import evaluate_config
 	# # 0.01,0.0001
 	# cfgs = [[0.1,0.0001]]
@@ -602,7 +620,8 @@ if __name__ == "__main__":
 	np.random.seed(43)
 	torch.manual_seed(23)
 
-	test()
+	# test()
+	cco_mobo()
 
 	# samples for eval
 	# generate_image_samples('ROI')

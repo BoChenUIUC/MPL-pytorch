@@ -114,15 +114,29 @@ class LightweightEncoder(nn.Module):
 			self.pool1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
 			self.ctx = ContextExtractor()
 		self.use_subsampling = use_subsampling
+		self.sizes = [0,0,0,0,0]
 
-	def forward(self, x):
+	def metrics(self):
+		print(self.sizes)
+
+	def forward(self, x, ss_map=None):
 		# sample from input
 		if self.use_subsampling:
 			x,thresh = x
+			self.sizes[0] += x.view(-1).size(0)*8
 			# feature 
 			feat_1 = self.ctx(x)
 			feat_1_ = self.unpool(feat_1)
+		else:
+			self.sizes[0] += x.view(-1).size(0)*8
 		x = self.sample(x)
+		# after CNN
+		self.sizes[1] += x.view(-1).size(0)*8
+
+		if ss_map is not None:
+			ss_map = self.unpool(ss_map)>0.5
+			unpooled = self.unpool(self.pool(x))
+			x = torch.where(ss_map, unpooled, x)
 
 		# subsampling
 		# data to be sent: mask + actual data
@@ -139,11 +153,13 @@ class LightweightEncoder(nn.Module):
 			cond_0 = torch.logical_not(cond_1)
 			data_0 = x[cond_0]
 			comp_data = torch.cat((data_0,data_1),0)
+			# after RAF
+			self.sizes[2] += comp_data.size(0)*8
 			# affected data in the original shape
-			# if not self.training:
-			x = torch.where(cond_1, ss_1, x)
-			# else:
-			# 	x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
+			if not self.training:
+				x = torch.where(cond_1, ss_1, x)
+			else:
+				x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
 			
 		# quantization
 		xsize = list(x.size())
@@ -158,12 +174,15 @@ class LightweightEncoder(nn.Module):
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
 			index2 = torch.min(quant_dist, dim=-1, keepdim=True)[1]
+			# after Q
+			self.sizes[3] += index2.view(-1).size(0)*3
 			# running length coding on bitmap
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index2.view(-1).cpu().numpy())) * 4 # bit
 			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
-			test = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
 			real_size += rle_len1
+			# after lossless
+			self.sizes[4] += real_size
 			filter_loss = torch.mean(feat_1)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			softmax_dist = nn.functional.softmax(-quant_dist, dim=-1)
@@ -171,8 +190,10 @@ class LightweightEncoder(nn.Module):
 			entropy = -torch.sum(torch.mul(soft_prob,torch.log(soft_prob)))
 			return x,(filter_loss,real_cr,entropy)
 		else:
+			self.sizes[2] += index.view(-1).size(0)*3
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
+			self.sizes[3] += real_size
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
 			return x,real_cr
 
@@ -228,8 +249,8 @@ class DeepCOD(nn.Module):
 		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
-	def forward(self, x):
-		x,r = self.encoder(x)
+	def forward(self, x, ss_map=None):
+		x,r = self.encoder(x,ss_map=ss_map)
 
 		# reconstruct
 		x = self.attention_1(x)

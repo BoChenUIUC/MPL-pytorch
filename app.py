@@ -566,7 +566,7 @@ def deepcod_validate():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-A-best.pth' if use_subsampling else 'backup/deepcod_soft_c8_best.pth'
+    PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
@@ -578,7 +578,7 @@ def deepcod_validate():
     gen_model.eval()
 
     thresh_list = []
-    thresh = torch.FloatTensor([0.5])
+    thresh = torch.FloatTensor([0.9])
     thresh_list.append(thresh)
 
     for thresh in thresh_list:
@@ -620,7 +620,7 @@ def deepcod_validate():
                     )
         with open("raw_eval.log" if use_subsampling else "original_eval.log", "a") as f:
             f.write(f"{top5.avg:.3f} {cr.avg:.5f}\n")
-
+        gen_model.encoder.metrics()
         test_iter.close()
 
     # top1: 74.24. top5: 95.76. r: 0.0073.
@@ -632,18 +632,15 @@ def disturb_exp():
     # data
     test_loader = sim.dataloader
     args = sim.opt
+    use_subsampling = args.use_subsampling
     # discriminator
     app_model = sim.model
     app_model.eval()
     # encoder+decoder
-    PATH = 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO-best.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     max_acc = 0
-    gen_model = DeepCOD(use_subsampling=False)
-    d = torch.load(PATH,map_location='cpu')
-    # for k in d.keys():
-    #     if 'encoder' in k:
-    #         print(k)
-    gen_model.load_state_dict(d)
+    gen_model = DeepCOD(use_subsampling=use_subsampling)
+    gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
         gen_model = gen_model.cuda()
     # print(gen_model.encoder.centers.data)
@@ -659,7 +656,19 @@ def disturb_exp():
     C_param = None
     cor1 = AverageMeter()
     cor2 = AverageMeter()
+    cor3 = AverageMeter()
+    thresh = torch.FloatTensor([0.5])
     for step, (images, targets) in enumerate(test_iter):
+        if step!=10:continue
+
+        # context map
+        recon,_,ctx = gen_model((images,thresh),use_feature=True)
+        fig = plot(ctx.detach())
+        plt.savefig(f'samples/ctx_map_{step:1}.png', bbox_inches='tight')
+        plt.close(fig)
+        ctx_arr = ctx.detach().view(-1).data.cpu().numpy()
+        break
+
         if TF is not None:
             feature_maps = None
             for th_img in images:
@@ -670,9 +679,9 @@ def disturb_exp():
                     feature_maps = tf_img
                 else:
                     feature_maps = torch.cat((feature_maps,tf_img),0)
-            # fig = plot(feature_maps)
-            # plt.savefig(f'samples/feature_map_{step:1}.png', bbox_inches='tight')
-            # plt.close(fig)
+            fig = plot(feature_maps)
+            plt.savefig(f'samples/feature_map_{step:1}.png', bbox_inches='tight')
+            plt.close(fig)
         if args.device != 'cpu':
             images = images.cuda()
             targets = targets.cuda()
@@ -682,11 +691,11 @@ def disturb_exp():
         feature_arr = feature_maps.view(-1).data.cpu().numpy()
         # magics
         X = Variable(images,requires_grad=True) 
-        # raw = images.data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
-        # fig = plot(raw)
-        # plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
-        # plt.close(fig)
-        recon,_ = gen_model(X)
+        raw = images.data.cpu().numpy().transpose(0,2,3,1).clip(0,1)
+        fig = plot(raw)
+        plt.savefig(f'samples/real_{step:1}.png', bbox_inches='tight')
+        plt.close(fig)
+        recon,res = gen_model((X,thresh))
         recon_labels = app_model(normalization(recon))
         loss = criterion_ce(recon_labels, targets)
         gradients = torch.autograd.grad(outputs=loss, inputs=X,
@@ -694,43 +703,46 @@ def disturb_exp():
                               create_graph=True, retain_graph=False, only_inputs=True)[0]
         impact = torch.norm(gradients.data, dim=1)
         impact = toMacroBlock(impact).view(B,-1)
-        # impact = F.softmax(impact.view(B,-1),dim=-1)
         samples = impact.view(B,H//8,W//8).data.cpu().numpy()
         impact_arr = impact.view(-1).data.cpu().numpy()
-        # fig = plot(samples)
-        # plt.savefig(f'samples/impact_{step:1}.png', bbox_inches='tight')
-        # plt.close(fig)
+        fig = plot(samples)
+        plt.savefig(f'samples/impact_{step:1}.png', bbox_inches='tight')
+        plt.close(fig)
         # save to file
         # loss map
         base_loss = loss.cpu().item()
         assert(H%8==0 and W%8==0)
-        ss_map = torch.zeros(B,C,H//8,W//8).cuda()
+        ss_map = torch.zeros(B,C,H//8,W//8)
         loss_map = torch.zeros(B,H//8,W//8)
         for b in range(B):
             for h in range(H//8):
                 for w in range(W//8):
                     ss_map[b,:,h,w] = 1
-                    recon,_ = gen_model(images,ss_map=ss_map)
+                    recon,_ = gen_model((images,thresh),ss_map=ss_map)
                     recon_labels = app_model(normalization(recon))
                     loss = criterion_ce(recon_labels, targets)
                     _, acc5 = accuracy(recon_labels, targets, (1, 5))
                     loss_map[b,h,w] = loss.cpu().item() - base_loss
                     ss_map[b,:,h,w] = 0
         loss_arr = loss_map.view(-1).data.cpu().numpy()
-        # samples = loss_map.data.cpu().numpy()
-        # fig = plot(samples)
-        # plt.savefig(f'samples/loss_map_{step:1}.png', bbox_inches='tight')
-        # plt.close(fig)
+        samples = loss_map.data.cpu().numpy()
+        fig = plot(samples)
+        plt.savefig(f'samples/loss_map_{step:1}.png', bbox_inches='tight')
+        plt.close(fig)
+
         # print(feature_arr,loss_arr,impact_arr)
         loss_arr = (loss_arr-np.mean(loss_arr))/np.std(loss_arr)/len(loss_arr)
+        ctx_arr = (ctx_arr-np.mean(ctx_arr))/np.std(ctx_arr)
         feature_arr = (feature_arr-np.mean(feature_arr))/np.std(feature_arr)
         impact_arr = (impact_arr-np.mean(impact_arr))/np.std(impact_arr)
         # print(loss_arr,feature_arr,impact_arr)
-        cor1.update(np.correlate(loss_arr,feature_arr)[0])
+        cor1.update(np.correlate(feature_arr,loss_arr)[0])
         cor2.update(np.correlate(impact_arr,loss_arr)[0])
+        cor3.update(np.correlate(ctx_arr,loss_arr)[0])
         test_iter.set_description(
             f"Cor1: {cor1.avg:.4f}. "
             f"Cor2: {cor2.avg:.4f}. "
+            f"Cor3: {cor3.avg:.4f}. "
             )
     test_iter.close()
 
